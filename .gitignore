@@ -1,0 +1,55 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl
+.terraformrc
+terraform.rc
+
+# AWS
+.aws/
+aws_credentials
+aws_config
+
+# Kubernetes / Helm
+.kube/
+config
+*.lock
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+.classpath
+.project
+.settings/
+
+# Secrets & Local configurations
+*.pem
+*.key
+*.pub
+tsig.key
+secrets.yaml
+secrets.yml
+env/
+.env
+
+# Logs and Reports
+*.log
+crash.log
+report.html
+metrics/
+
+# Load Testing (Locust / K6)
+__pycache__/
+*.pyc
+node_modules/
+dist/
+build/
