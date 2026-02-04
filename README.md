@@ -30,57 +30,46 @@ VPC: 10.0.0.0/16
 
 ---
 
-## 📁 Structure du Projet
+### 📁 Structure du Projet
 
 ```
 hetic-friday/
-├── terragrunt.hcl                    # Config racine (backend S3)
-├── terraform/
-│   └── modules/
-│       └── networking/               # Module VPC ✅
-│           ├── main.tf
-│           ├── variables.tf
-│           ├── outputs.tf
-│           └── versions.tf
-├── environments/
+├── live/                             # Infrastructure déployée "Live"
+│   ├── root.hcl                      # Config racine (backend S3)
 │   ├── dev/
 │   │   └── networking/
-│   │       └── terragrunt.hcl       # 1 NAT Gateway
+│   │       └── terragrunt.hcl        # Env Dev
 │   └── prod/
 │       └── networking/
-│           └── terragrunt.hcl       # 3 NAT Gateways (1/AZ)
+│           └── terragrunt.hcl        # Env Prod
+├── terraform/                        # Code source des modules
+│   └── modules/
+│       └── networking/
+│           ├── main.tf
+│           └── ...
 └── .gitignore
 ```
-
----
-
-## 🚀 Démarrage Rapide
-
-### Prérequis
-- **AWS CLI** configuré (`aws configure`)
-- **Terragrunt** installé (`brew install terragrunt`)
 
 ### 🛠️ Déploiement
 
 **1. Environnement de Dev (Recommandé)**
 ```bash
-cd environments/dev/networking
+cd live/dev/networking
 terragrunt apply
 ```
 *Note : Si Terragrunt demande de créer le bucket S3, répondez `y`.*
 
 **2. Environnement de Prod**
 ```bash
-cd environments/prod/networking
+cd live/prod/networking
 terragrunt apply
 ```
 
 ### 💥 Destruction (Nettoyage)
 
 **1. Détruire les ressources AWS**
-Cela supprime l'infrastructure (VPC, NAT, etc.) mais conserve l'état dans S3 :
 ```bash
-cd environments/dev/networking
+cd live/dev/networking
 terragrunt destroy
 ```
 
