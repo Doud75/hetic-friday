@@ -124,3 +124,9 @@ Pour comprendre ce qui se passe durant le crash test :
 | **EKS** | ECS / EC2 | Standard de l'industrie, écosystème immense (Helm, opérateurs). |
 | **Spot Instances** | Tout On-Demand | Réduction drastique des coûts (-70%) pour la charge massive. |
 | **PostgreSQL** | MySQL / NoSQL | Fiabilité des transactions (ACID) critique pour les commandes/paiements. |
+
+---
+
+## 7. Schéma de l'Architecture (Vue Détaillée)
+
+![Architecture AWS Multi-AZ détaillée](docs/architecture_aws_detailed.png)

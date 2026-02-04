@@ -8,6 +8,9 @@
 .terraformrc
 terraform.rc
 
+# Terragrunt
+.terragrunt-cache/
+
 # AWS
 .aws/
 aws_credentials

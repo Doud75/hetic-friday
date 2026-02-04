@@ -53,11 +53,16 @@ hetic-friday/
 ### 🛠️ Déploiement
 
 **1. Environnement de Dev (Recommandé)**
+Si bucket S3 n'est pas créé :
+```bash
+cd live/dev/
+terragrunt run --all --backend-bootstrap init
+```
+ou
 ```bash
 cd live/dev/
 terragrunt run --all apply
 ```
-*Note : Si Terragrunt demande de créer le bucket S3, répondez `y`.*
 
 **2. Environnement de Prod**
 ```bash
@@ -81,10 +86,11 @@ Pour tout supprimer définitivement (y compris le backend S3) :
 chmod +x scripts/empty_bucket.sh
 ./scripts/empty_bucket.sh hetic-friday-g2-terraform-state
 ```
-3. Supprimer le bucket et la table DynamoDB :
+3. Supprimer le bucket et la table DynamoDB et Cloud Watch:
 ```bash
 aws s3 rb s3://hetic-friday-g2-terraform-state --force
 aws dynamodb delete-table --table-name hetic-friday-g2-terraform-locks --region eu-central-1
+aws logs delete-log-group --log-group-name /aws/vpc/hetic_friday_g2-dev --region eu-central-1
 ```
 
 ---
