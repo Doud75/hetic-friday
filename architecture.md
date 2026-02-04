@@ -26,11 +26,11 @@ Nous utilisons une stratégie multi-comptes ou multi-environnements logiques :
 
 Le réseau est la fondation de l'infrastructure. Nous utilisons une topologie "Hub & Spoke" simplifiée au sein d'un VPC unique par environnement.
 
-### 2.1. Découpage IP (Méthode des Bataillons)
+### 2.1. Découpage IP (Architecture en Couches)
 Nous utilisons un découpage CIDR strict pour garantir l'évolutivité et la sécurité.
 *   **VPC CIDR** : `10.0.0.0/16` (65 536 IPs disponibles).
 
-Les sous-réseaux sont organisés en couches (Bataillons) :
+Les sous-réseaux sont organisés en couches logiques (Tiers) :
 *   **Public Layer (`10.0.0.0/20`)** :
     *   Contient : Load Balancers (ALB), NAT Gateways, Bastion.
     *   *Pourquoi ?* Ce sont les seuls composants qui doivent être exposés (directement ou indirectement) à Internet.
@@ -124,4 +124,3 @@ Pour comprendre ce qui se passe durant le crash test :
 | **EKS** | ECS / EC2 | Standard de l'industrie, écosystème immense (Helm, opérateurs). |
 | **Spot Instances** | Tout On-Demand | Réduction drastique des coûts (-70%) pour la charge massive. |
 | **PostgreSQL** | MySQL / NoSQL | Fiabilité des transactions (ACID) critique pour les commandes/paiements. |
-| **Bataillons IP** | CIDR plat (/24) | Organisation logique, évolutive et facile à sécuriser (NACLs par plage). |
