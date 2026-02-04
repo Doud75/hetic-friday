@@ -59,19 +59,19 @@ variable "enable_dns_support" {
 }
 
 variable "public_subnet_cidrs" {
-  description = "CIDR blocks pour les subnets publics (bataillon 10.0.0.0/20)"
+  description = "CIDR blocks pour les subnets publics (Public Layer 10.0.0.0/20)"
   type        = list(string)
   default     = ["10.0.0.0/22", "10.0.4.0/22", "10.0.8.0/22"]
 }
 
 variable "private_subnet_cidrs" {
-  description = "CIDR blocks pour les subnets privés (bataillon 10.0.16.0/20)"
+  description = "CIDR blocks pour les subnets privés (Private Layer 10.0.16.0/20)"
   type        = list(string)
   default     = ["10.0.16.0/22", "10.0.20.0/22", "10.0.24.0/22"]
 }
 
 variable "data_subnet_cidrs" {
-  description = "CIDR blocks pour les subnets data (bataillon 10.0.32.0/21)"
+  description = "CIDR blocks pour les subnets data (Data Layer 10.0.32.0/21)"
   type        = list(string)
   default     = ["10.0.32.0/24", "10.0.33.0/24", "10.0.34.0/24"]
 }

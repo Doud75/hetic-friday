@@ -17,13 +17,13 @@ Simulation de crise e-commerce sur AWS avec Google Online Boutique.
 - **Database** : RDS PostgreSQL (Multi-AZ + Read Replicas)
 - **Monitoring** : CloudWatch + Prometheus + Grafana
 
-### Réseau (CIDR Bataillons)
+### Réseau (Subnet Tiers)
 ```
 VPC: 10.0.0.0/16
-├─ Bataillon Public  (10.0.0.0/20)  → ALB, NAT, Bastion
-├─ Bataillon Private (10.0.16.0/20) → EKS Nodes
-├─ Bataillon Data    (10.0.32.0/21) → RDS
-└─ Réservé           (10.0.40.0/21) → Cache, VPN
+├─ Public Layer  (10.0.0.0/20)  → ALB, NAT, Bastion
+├─ Private Layer (10.0.16.0/20) → EKS Nodes
+├─ Data Layer    (10.0.32.0/21) → RDS
+└─ Réservé       (10.0.40.0/21) → Cache, VPN
 ```
 
 **Multi-AZ** : 3 zones (eu-central-1a/b/c) pour haute disponibilité
@@ -54,23 +54,23 @@ hetic-friday/
 
 **1. Environnement de Dev (Recommandé)**
 ```bash
-cd live/dev/networking
-terragrunt apply
+cd live/dev/
+terragrunt run --all apply
 ```
 *Note : Si Terragrunt demande de créer le bucket S3, répondez `y`.*
 
 **2. Environnement de Prod**
 ```bash
-cd live/prod/networking
-terragrunt apply
+cd live/prod/
+terragrunt run --all apply
 ```
 
 ### 💥 Destruction (Nettoyage)
 
 **1. Détruire les ressources AWS**
 ```bash
-cd live/dev/networking
-terragrunt destroy
+cd live/dev/
+terragrunt run --all destroy
 ```
 
 **2. Destruction Totale (State inclus)**
