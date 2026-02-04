@@ -43,6 +43,7 @@ secrets.yaml
 secrets.yml
 env/
 .env
+*secrets.hcl
 
 # Logs and Reports
 *.log
@@ -56,3 +57,4 @@ __pycache__/
 node_modules/
 dist/
 build/
+
