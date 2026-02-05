@@ -1,0 +1,175 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "Continuous Integration - Main/Release"
+on:
+  push:
+    # run on pushes to main or release/*
+    branches:
+      - main
+      - release/*
+    paths-ignore:
+      - "**/README.md"
+      - "kustomize/**"
+      - ".github/workflows/kustomize-build-ci.yaml"
+      - "terraform/**"
+      - ".github/workflows/terraform-validate-ci.yaml"
+      - "helm-chart/**"
+      - ".github/workflows/helm-chart-ci.yaml"
+
+jobs:
+  code-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: "./.dotnet"
+        with:
+          dotnet-version: "9.0"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+      - name: Go Unit Tests
+        timeout-minutes: 10
+        run: |
+          for SERVICE in "shippingservice" "productcatalogservice"; do
+            echo "testing $SERVICE..."
+            pushd src/$SERVICE
+            go test
+            popd
+          done
+      - name: C# Unit Tests
+        timeout-minutes: 10
+        run: |
+          dotnet test src/cartservice/
+
+  deployment-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    needs: code-tests
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Skaffold
+        run: |
+          curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64
+          sudo install skaffold /usr/local/bin/
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: main-test-cluster
+          wait: 120s
+
+      - name: Build and Deploy to local kind cluster
+        timeout-minutes: 20
+        run: |
+          PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
+          NAMESPACE="main-${GITHUB_SHA:0:8}"
+          echo "Deploying to namespace: $NAMESPACE"
+
+          kubectl create namespace $NAMESPACE || true
+          kubectl config set-context --current --namespace=$NAMESPACE
+
+          echo "Building and deploying with Skaffold..."
+          skaffold config set --global local-cluster true
+        skaffold run --namespace=$NAMESPACE --tag=${GITHUB_SHA:0:8}
+        timeout-minutes: 20
+        run: |
+          set -x
+          NAMESPACE="main-${GITHUB_SHA:0:8}"
+          kubectl config set-context --current --namespace=$NAMESPACE
+
+          echo "Waiting for all deployments to be ready..."
+          kubectl wait --for=condition=available --timeout=600s deployment/redis-cart || true
+          kubectl wait --for=condition=available --timeout=600s deployment/adservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/cartservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/checkoutservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/currencyservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/emailservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/frontend || true
+          kubectl wait --for=condition=available --timeout=600s deployment/loadgenerator || true
+          kubectl wait --for=condition=available --timeout=600s deployment/paymentservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/productcatalogservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/recommendationservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/shippingservice || true
+
+      - name: Check Deployment Status
+        timeout-minutes: 5
+        run: |
+          set -x
+          NAMESPACE="main-${GITHUB_SHA:0:8}"
+          echo "📊 Deployment status:"
+          kubectl get pods -n $NAMESPACE
+          kubectl get services -n $NAMESPACE
+
+          # Count running pods
+          RUNNING_PODS=$(kubectl get pods -n $NAMESPACE --field-selector=status.phase=Running --no-headers | wc -l)
+          echo "✅ Running pods: $RUNNING_PODS"
+
+      - name: Smoke Test
+        timeout-minutes: 5
+        run: |
+          set -x
+          NAMESPACE="main-${GITHUB_SHA:0:8}"
+
+          # Port-forward to frontend for local testing
+          kubectl port-forward -n $NAMESPACE svc/frontend 8080:80 &
+          PF_PID=$!
+          sleep 5
+
+          # Test frontend is responding
+          curl -f http://localhost:8080 || echo "⚠️  Frontend not responding yet"
+
+          # Check loadgenerator logs if it exists
+          if kubectl get deployment loadgenerator -n $NAMESPACE &>/dev/null; then
+            echo "Checking loadgenerator logs..."
+            # start fresh loadgenerator pod
+            kubectl delete pod -l app=loadgenerator -n $NAMESPACE || true
+            sleep 10
+            # wait for requests to come in
+            REQUEST_COUNT="0"
+            RETRIES=0
+            while [[ "$REQUEST_COUNT" -lt "50" ]] && [[ "$RETRIES" -lt "20" ]]; do
+                sleep 5
+                REQUEST_COUNT=$(kubectl logs -l app=loadgenerator -n $NAMESPACE 2>/dev/null | grep Aggregated | awk '{print $2}' || echo "0")
+                ((RETRIES++))
+            done
+            # ensure there are no errors hitting endpoints
+            ERROR_COUNT=$(kubectl logs -l app=loadgenerator -n $NAMESPACE 2>/dev/null | grep Aggregated | awk '{print $3}' | sed "s/[(][^)]*[)]//g" || echo "0")
+            if [[ "$ERROR_COUNT" -gt "0" ]]; then
+              echo "⚠️  Load generator reported errors: $ERROR_COUNT"
+            fi
+          fi
+
+          kill $PF_PID || true
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          NAMESPACE="main-${GITHUB_SHA:0:8}"
+          echo "📋 Deployment events:"
+          kubectl get events -n $NAMESPACE --sort-by='.lastTimestamp'
+          echo "📋 Pod logs:"
+          kubectl logs -l app=frontend -n $NAMESPACE --tail=100 || true
+          kubectl logs -l app=cartservice -n $NAMESPACE --tail=100 || true

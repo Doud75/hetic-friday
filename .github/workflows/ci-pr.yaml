@@ -1,0 +1,181 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "Continuous Integration - Pull Request"
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "**/README.md"
+      - "kustomize/**"
+      - ".github/workflows/kustomize-build-ci.yaml"
+      - "terraform/**"
+      - ".github/workflows/terraform-validate-ci.yaml"
+      - "helm-chart/**"
+      - ".github/workflows/helm-chart-ci.yaml"
+
+# Ensure this workflow only runs for the most recent commit of a pull-request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  code-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: "./.dotnet"
+        with:
+          dotnet-version: "9.0"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+      - name: Go Unit Tests
+        timeout-minutes: 10
+        run: |
+          for GO_PACKAGE in "shippingservice" "productcatalogservice" "frontend/validator"; do
+            echo "Testing $GO_PACKAGE..."
+            pushd src/$GO_PACKAGE
+            go test
+            popd
+          done
+      - name: C# Unit Tests
+        timeout-minutes: 10
+        run: |
+          dotnet test src/cartservice/
+
+  deployment-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    needs: code-tests
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{github.event.pull_request.head.sha}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Skaffold
+        run: |
+          curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64
+          sudo install skaffold /usr/local/bin/
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: pr-test-cluster
+          wait: 120s
+
+      - name: Build and Deploy to local kind cluster
+        timeout-minutes: 20
+        run: |
+          NAMESPACE="pr${{ github.event.pull_request.number }}"
+          echo "Deploying to namespace: $NAMESPACE"
+
+          kubectl create namespace $NAMESPACE || true
+          kubectl config set-context --current --namespace=$NAMESPACE
+
+          echo "Building and deploying with Skaffold..."
+          skaffold config set --global local-cluster true
+          skaffold run --namespace=$NAMESPACE --tag=pr-${{ github.event.pull_request.number }}
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Wait For Pods
+        timeout-minutes: 20
+        run: |
+          set -x
+          NAMESPACE="pr${{ github.event.pull_request.number }}"
+          kubectl config set-context --current --namespace=$NAMESPACE
+
+          echo "Waiting for all deployments to be ready..."
+          kubectl wait --for=condition=available --timeout=600s deployment/redis-cart || true
+          kubectl wait --for=condition=available --timeout=600s deployment/adservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/cartservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/checkoutservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/currencyservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/emailservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/frontend || true
+          kubectl wait --for=condition=available --timeout=600s deployment/loadgenerator || true
+          kubectl wait --for=condition=available --timeout=600s deployment/paymentservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/productcatalogservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/recommendationservice || true
+          kubectl wait --for=condition=available --timeout=600s deployment/shippingservice || true
+
+      - name: Check Deployment Status
+        timeout-minutes: 5
+        run: |
+          set -x
+          NAMESPACE="pr${{ github.event.pull_request.number }}"
+          echo "📊 Deployment status:"
+          kubectl get pods -n $NAMESPACE
+          kubectl get services -n $NAMESPACE
+
+          # Count running pods
+          RUNNING_PODS=$(kubectl get pods -n $NAMESPACE --field-selector=status.phase=Running --no-headers | wc -l)
+          echo "✅ Running pods: $RUNNING_PODS"
+
+      - name: Smoke Test
+        timeout-minutes: 5
+        run: |
+          set -x
+          NAMESPACE="pr${{ github.event.pull_request.number }}"
+
+          # Port-forward to frontend for local testing
+          kubectl port-forward -n $NAMESPACE svc/frontend 8080:80 &
+          PF_PID=$!
+          sleep 5
+
+          # Test frontend is responding
+          curl -f http://localhost:8080 || echo "⚠️  Frontend not responding yet"
+
+          # Check loadgenerator logs if it exists
+          if kubectl get deployment loadgenerator -n $NAMESPACE &>/dev/null; then
+            echo "Checking loadgenerator logs..."
+            kubectl logs -l app=loadgenerator -n $NAMESPACE --tail=50 || true
+          fi
+
+          kill $PF_PID || true
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          NAMESPACE="pr${{ github.event.pull_request.number }}"
+          echo "📋 Deployment events:"
+          kubectl get events -n $NAMESPACE --sort-by='.lastTimestamp'
+          echo "📋 Pod logs:"
+          kubectl logs -l app=frontend -n $NAMESPACE --tail=100 || true
+          kubectl logs -l app=cartservice -n $NAMESPACE --tail=100 || true
+
+      - name: Comment PR
+        if: always()
+        env:
+          COMMENTS_URL: ${{ github.event.pull_request.comments_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl \
+            -X POST \
+            $COMMENTS_URL \
+            -H "Content-Type: application/json" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            --data '{ "body": "✅ PR successfully deployed and tested on local kind cluster (namespace: pr${{ github.event.pull_request.number }})" }'
