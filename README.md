@@ -38,57 +38,26 @@ VPC: 10.0.0.0/16
 hetic-friday/
 ├── live/                             # Infrastructure déployée "Live"
 │   ├── root.hcl                      # Config racine (backend S3)
-<<<<<<< HEAD
-<<<<<<< HEAD
-│   ├── dev/                          # Env Dev
-│   │   └── monitoring/
-│   │       └── terragrunt.hcl
-│   │   └── networking/
-│   │       └── terragrunt.hcl        
-│   │       └── secrets.yaml
-│   ├── prod/                         # Env Prod
-│   │   └── monitoring/
-│   │       └── terragrunt.hcl
-│   │   └── networking/
-│   │       └── terragrunt.hcl        
-│   │       └── secrets.yaml
-=======
-=======
->>>>>>> edf3cca (update readme config informations)
 │   ├── dev/
-│   │   └── secrets.hcl
+│   │   └── secrets.hcl               # Env Dev
+│   │   └── monitoring/
+│   │       └── terragrunt.hcl
 │   │   └── vpc/
-│   │       └── terragrunt.hcl        # Env Dev
+│   │       └── terragrunt.hcl        
 │   │   └── rds/
 │   │       └── terragrunt.hcl
 │   │   └── security/
 │   │       └── terragrunt.hcl
 │   └── prod/
-│       └── secrets.hcl
+│       └── secrets.hcl               # Env Prod
+│       └── monitoring/
+│          └── terragrunt.hcl
 │       └── vpc/
-│           └── terragrunt.hcl        # Env Prod
+│           └── terragrunt.hcl        
 │       └── rds/
 │           └── terragrunt.hcl
 │       └── security/
 │           └── terragrunt.hcl
-<<<<<<< HEAD
->>>>>>> 7557546 (feat: add terraform modules for rds and security)
-=======
-=======
-│   ├── dev/                          # Env Dev
-│   │   └── monitoring/
-│   │       └── terragrunt.hcl
-│   │   └── networking/
-│   │       └── terragrunt.hcl        
-│   │       └── secrets.yaml
-│   ├── prod/                         # Env Prod
-│   │   └── monitoring/
-│   │       └── terragrunt.hcl
-│   │   └── networking/
-│   │       └── terragrunt.hcl        
-│   │       └── secrets.yaml
->>>>>>> 7d05924 (update readme config informations)
->>>>>>> edf3cca (update readme config informations)
 ├── terraform/                        # Code source des modules
 │   └── modules/
 │       └── vpc/
