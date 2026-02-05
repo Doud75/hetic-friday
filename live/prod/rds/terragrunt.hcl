@@ -27,7 +27,7 @@ dependency "security" {
 }
 
 inputs = {
-  environment = "dev"
+  environment = "prod"
   
   vpc_id = dependency.vpc.outputs.vpc_id
 
