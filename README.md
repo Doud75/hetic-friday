@@ -39,17 +39,21 @@ hetic-friday/
 ├── live/                             # Infrastructure déployée "Live"
 │   ├── root.hcl                      # Config racine (backend S3)
 │   ├── dev/
-│   │   └── secrets.hcl
+│   │   └── secrets.hcl               # Env Dev
+│   │   └── monitoring/
+│   │       └── terragrunt.hcl
 │   │   └── vpc/
-│   │       └── terragrunt.hcl        # Env Dev
+│   │       └── terragrunt.hcl        
 │   │   └── rds/
 │   │       └── terragrunt.hcl
 │   │   └── security/
 │   │       └── terragrunt.hcl
 │   └── prod/
-│       └── secrets.hcl
+│       └── secrets.hcl               # Env Prod
+│       └── monitoring/
+│          └── terragrunt.hcl
 │       └── vpc/
-│           └── terragrunt.hcl        # Env Prod
+│           └── terragrunt.hcl        
 │       └── rds/
 │           └── terragrunt.hcl
 │       └── security/
@@ -60,6 +64,14 @@ hetic-friday/
 │           ├── main.tf
 │           └── ...
 └── .gitignore
+```
+
+### Config
+
+Ajouter le fichier secrets.yaml en dev et en prod avec ces variables :
+
+```
+alert_email: "exemple@email.com"
 ```
 
 ### 🛠️ Déploiement
