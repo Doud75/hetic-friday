@@ -11,6 +11,7 @@ Simulation de crise e-commerce sur AWS avec Google Online Boutique.
 ## 🏗️ Architecture
 
 ### Infrastructure
+
 - **Cloud Provider** : AWS (région `eu-central-1` - Frankfurt)
 - **IaC** : Terraform + Terragrunt
 - **Orchestration** : Amazon EKS (Kubernetes)
@@ -18,6 +19,7 @@ Simulation de crise e-commerce sur AWS avec Google Online Boutique.
 - **Monitoring** : CloudWatch + Prometheus + Grafana
 
 ### Réseau (Subnet Tiers)
+
 ```
 VPC: 10.0.0.0/16
 ├─ Public Layer  (10.0.0.0/20)  → ALB, NAT, Bastion
@@ -37,14 +39,24 @@ hetic-friday/
 ├── live/                             # Infrastructure déployée "Live"
 │   ├── root.hcl                      # Config racine (backend S3)
 │   ├── dev/
-│   │   └── networking/
+│   │   └── secrets.hcl
+│   │   └── vpc/
 │   │       └── terragrunt.hcl        # Env Dev
+│   │   └── rds/
+│   │       └── terragrunt.hcl
+│   │   └── security/
+│   │       └── terragrunt.hcl
 │   └── prod/
-│       └── networking/
+│       └── secrets.hcl
+│       └── vpc/
 │           └── terragrunt.hcl        # Env Prod
+│       └── rds/
+│           └── terragrunt.hcl
+│       └── security/
+│           └── terragrunt.hcl
 ├── terraform/                        # Code source des modules
 │   └── modules/
-│       └── networking/
+│       └── vpc/
 │           ├── main.tf
 │           └── ...
 └── .gitignore
@@ -54,17 +66,21 @@ hetic-friday/
 
 **1. Environnement de Dev (Recommandé)**
 Si bucket S3 n'est pas créé :
+
 ```bash
 cd live/dev/
 terragrunt run --all --backend-bootstrap init
 ```
+
 ou
+
 ```bash
 cd live/dev/
 terragrunt run --all apply
 ```
 
 **2. Environnement de Prod**
+
 ```bash
 cd live/prod/
 terragrunt run --all apply
@@ -73,6 +89,7 @@ terragrunt run --all apply
 ### 💥 Destruction (Nettoyage)
 
 **1. Détruire les ressources AWS**
+
 ```bash
 cd live/dev/
 terragrunt run --all destroy
@@ -80,13 +97,17 @@ terragrunt run --all destroy
 
 **2. Destruction Totale (State inclus)**
 Pour tout supprimer définitivement (y compris le backend S3) :
+
 1. Détruire l'environnement (`terragrunt destroy`).
 2. Utiliser le script de nettoyage fourni pour vider le bucket versionné :
+
 ```bash
 chmod +x scripts/empty_bucket.sh
 ./scripts/empty_bucket.sh hetic-friday-g2-terraform-state
 ```
+
 3. Supprimer le bucket et la table DynamoDB et Cloud Watch:
+
 ```bash
 aws s3 rb s3://hetic-friday-g2-terraform-state --force
 aws dynamodb delete-table --table-name hetic-friday-g2-terraform-locks --region eu-central-1

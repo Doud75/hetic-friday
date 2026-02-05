@@ -3,7 +3,7 @@ include "root" {
 }
 
 terraform {
-  source = "../../../terraform/modules/networking"
+  source = "../../../terraform/modules/vpc"
 }
 
 inputs = {

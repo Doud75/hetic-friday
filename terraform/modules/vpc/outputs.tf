@@ -57,3 +57,8 @@ output "availability_zones" {
   description = "Availability zones utilisées"
   value       = var.availability_zones
 }
+
+output "db_subnets" {
+  description = "Liste des subnets privés DB"
+  value       = aws_subnet.data[*].id
+}
