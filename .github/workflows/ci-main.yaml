@@ -93,7 +93,9 @@ jobs:
 
           echo "Building and deploying with Skaffold..."
           skaffold config set --global local-cluster true
-        skaffold run --namespace=$NAMESPACE --tag=${GITHUB_SHA:0:8}
+          skaffold run --namespace=$NAMESPACE --tag=${GITHUB_SHA:0:8}
+
+      - name: Wait For Pods
         timeout-minutes: 20
         run: |
           set -x
