@@ -2,9 +2,7 @@
 
 Simulation de crise e-commerce sur AWS avec Google Online Boutique.
 
-**Objectif** : Tenir 90K utilisateurs simultanés sans crash  
-**Durée** : 3 semaines + 2 jours de démo  
-**Budget** : 1 500€ - 2 000€
+**Objectif** : Tenir 90K utilisateurs simultanés sans crash
 
 ---
 
@@ -36,43 +34,77 @@ VPC: 10.0.0.0/16
 
 ```
 hetic-friday/
-├── live/                             # Infrastructure déployée "Live"
-│   ├── root.hcl                      # Config racine (backend S3)
+├── live/
+│   ├── root.hcl
 │   ├── dev/
-│   │   └── secrets.hcl               # Env Dev
+│   │   ├── secrets.hcl
+│   │   ├── vpc/
+│   │   │   └── terragrunt.hcl
+│   │   ├── security/
+│   │   │   └── terragrunt.hcl
+│   │   ├── rds/
+│   │   │   └── terragrunt.hcl
+│   │   ├── eks/
+│   │   │   └── terragrunt.hcl
 │   │   └── monitoring/
 │   │       └── terragrunt.hcl
-│   │   └── vpc/
-│   │       └── terragrunt.hcl        
-│   │   └── rds/
-│   │       └── terragrunt.hcl
-│   │   └── security/
-│   │       └── terragrunt.hcl
 │   └── prod/
-│       └── secrets.hcl               # Env Prod
+│       ├── secrets.hcl
+│       ├── vpc/
+│       │   └── terragrunt.hcl
+│       ├── security/
+│       │   └── terragrunt.hcl
+│       ├── rds/
+│       │   └── terragrunt.hcl
+│       ├── eks/
+│       │   └── terragrunt.hcl
 │       └── monitoring/
-│          └── terragrunt.hcl
-│       └── vpc/
-│           └── terragrunt.hcl        
-│       └── rds/
 │           └── terragrunt.hcl
-│       └── security/
-│           └── terragrunt.hcl
-├── terraform/                        # Code source des modules
+├── terraform/
 │   └── modules/
-│       └── vpc/
-│           ├── main.tf
-│           └── ...
+│       ├── vpc/
+│       ├── security/
+│       ├── rds/
+│       ├── monitoring/
+│       └── eks/
 └── .gitignore
 ```
 
-### Config
+---
 
-Ajouter le fichier secrets.yaml en dev et en prod avec ces variables :
+## ⚙️ Configuration Initiale
 
+### 1. Créer les fichiers secrets
+
+Les credentials RDS sont stockés dans des fichiers `secrets.hcl` (non versionnés dans Git).
+
+**Pour dev :**
+```bash
+cat > live/dev/secrets.hcl << 'EOF'
+inputs = {
+  db_username = "admin"
+  db_password = "VotreMotDePasseSecure123!"
+  ip_publique = "0.0.0.0/0"
+  alert_email = "exemple@email.com"
+}
+EOF
 ```
-alert_email: "exemple@email.com"
+
+**Pour prod :**
+```bash
+cat > live/prod/secrets.hcl << 'EOF'
+inputs = {
+  db_username = "admin"
+  db_password = "UnAutreMotDePasseTresSecure456!"
+  ip_publique = "ip.from.your.place/please"
+  alert_email = "exemple@email.com"
+}
+EOF
 ```
+
+⚠️ **Important** : Ces fichiers sont dans `.gitignore` et ne doivent **jamais** être commités.
+
+---
 
 ### 🛠️ Déploiement
 
@@ -118,12 +150,11 @@ chmod +x scripts/empty_bucket.sh
 ./scripts/empty_bucket.sh hetic-friday-g2-terraform-state
 ```
 
-3. Supprimer le bucket et la table DynamoDB et Cloud Watch:
+3. Supprimer le bucket et la table DynamoDB :
 
 ```bash
 aws s3 rb s3://hetic-friday-g2-terraform-state --force
 aws dynamodb delete-table --table-name hetic-friday-g2-terraform-locks --region eu-central-1
-aws logs delete-log-group --log-group-name /aws/vpc/hetic_friday_g2-dev --region eu-central-1
 ```
 
 ---
