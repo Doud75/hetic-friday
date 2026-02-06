@@ -22,5 +22,5 @@ inputs = {
   environment = "prod"
   
   nat_gateway_ids = dependency.vpc.outputs.nat_gateway_ids
-  alert_email     = local.secrets.alert_email
+  alert_email     = local.secret_vars.inputs.alert_email
 }
