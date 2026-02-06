@@ -86,6 +86,13 @@ inputs = {
   db_password = "VotreMotDePasseSecure123!"
   ip_publique = "0.0.0.0/0"
   alert_email = "exemple@email.com"
+  map_users = [
+    {
+      userarn  = "arn:aws:iam::123456789101:user/NOM-Prénom"
+      username = "username"
+      groups   = ["system:masters"]
+    }...
+  ]
 }
 EOF
 ```
@@ -98,6 +105,13 @@ inputs = {
   db_password = "UnAutreMotDePasseTresSecure456!"
   ip_publique = "ip.from.your.place/please"
   alert_email = "exemple@email.com"
+  map_users = [
+    {
+      userarn  = "arn:aws:iam::123456789101:user/NOM-Prénom"
+      username = "username"
+      groups   = ["system:masters"]
+    }...
+  ]
 }
 EOF
 ```

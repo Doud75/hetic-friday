@@ -172,3 +172,38 @@ resource "aws_eks_addon" "kube_proxy" {
     aws_eks_node_group.system
   ]
 }
+
+provider "kubernetes" {
+  host                   = aws_eks_cluster.main.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.main.certificate_authority[0].data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.main.name]
+  }
+}
+
+resource "kubernetes_config_map" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
+
+  data = {
+    mapRoles = yamlencode([
+      {
+        rolearn  = aws_iam_role.node.arn
+        username = "system:node:{{EC2PrivateDNSName}}"
+        groups   = ["system:bootstrappers", "system:nodes"]
+      }
+    ])
+    mapUsers = yamlencode(var.map_users)
+  }
+
+  depends_on = [
+    aws_eks_cluster.main,
+    aws_eks_node_group.system,
+    aws_eks_node_group.application
+  ]
+}
