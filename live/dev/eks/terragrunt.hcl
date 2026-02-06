@@ -27,12 +27,12 @@ inputs = {
   system_node_desired_size = 2
   system_node_min_size     = 2
   system_node_max_size     = 3
-  system_instance_types    = ["t3.medium"]
+  system_instance_types    = ["t3.small"]
 
   app_node_desired_size = 2
   app_node_min_size     = 2
   app_node_max_size     = 10
-  app_instance_types    = ["t3.large"]
+  app_instance_types    = ["t3.small"]
 
   enable_spot_instances = true
 }
