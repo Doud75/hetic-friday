@@ -10,8 +10,8 @@ terraform {
   source = "../../../terraform/modules/monitoring"
 }
 
-dependency "networking" {
-  config_path = "../networking"
+dependency "vpc" {
+  config_path = "../vpc"
   
   mock_outputs = {
     nat_gateway_ids = ["nat-0123456789abcdef0"]
@@ -21,6 +21,6 @@ dependency "networking" {
 inputs = {
   environment = "dev"
   
-  nat_gateway_ids = dependency.networking.outputs.nat_gateway_ids
+  nat_gateway_ids = dependency.vpc.outputs.nat_gateway_ids
   alert_email     = local.secrets.alert_email
 }
