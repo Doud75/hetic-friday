@@ -70,7 +70,7 @@ spec:
         - /bin/sh
         - -exc
         - |
-          MAX_RETRIES=12
+          MAX_RETRIES=30
           RETRY_INTERVAL=10
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i: Pinging frontend: ${FRONTEND_ADDR}..."
@@ -113,7 +113,7 @@ spec:
         - name: USERS
           value: "10"
         - name: RATE
-          value: "1"
+          value: "5"
         resources:
           {{- toYaml .Values.loadGenerator.resources | nindent 10 }}
 {{- if .Values.networkPolicies.create }}

@@ -22,6 +22,7 @@ RUN apk update \
 
 COPY requirements.txt .
 
+RUN pip install setuptools
 RUN pip install --prefix="/install" -r requirements.txt
 
 FROM base
