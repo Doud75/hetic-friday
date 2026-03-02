@@ -22,6 +22,7 @@ RUN apk update \
 
 # get packages
 COPY requirements.txt .
+RUN pip install setuptools
 RUN pip install -r requirements.txt
 
 FROM base
