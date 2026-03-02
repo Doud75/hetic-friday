@@ -16,6 +16,10 @@ dependency "vpc" {
   
 }
 
+locals {
+  secret_vars = read_terragrunt_config(find_in_parent_folders("secrets.hcl", "${get_terragrunt_dir()}/secrets.hcl"))
+}
+
 inputs = {
   project_name       = "hetic_friday_g2"
   environment        = "prod"
@@ -36,4 +40,6 @@ inputs = {
   app_instance_types    = ["t3.small"]
 
   enable_spot_instances = true
+
+  map_users = local.secret_vars.inputs.map_users
 }

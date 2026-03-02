@@ -83,3 +83,13 @@ variable "enable_spot_instances" {
   type        = bool
   default     = true
 }
+
+variable "map_users" {
+  description = "Liste des utilisateurs à mapper avec EKS"
+  type = list(object({
+    userarn  = string
+    username = string
+    groups   = list(string)
+  }))
+  default = []
+}
