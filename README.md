@@ -118,6 +118,16 @@ EOF
 
 ⚠️ **Important** : Ces fichiers sont dans `.gitignore` et ne doivent **jamais** être commités.
 
+
+### Modification du manifest Kubernetes
+
+Après avoir modifié le composants Kubernetes, il faut regénérer le manifest global :
+```bash
+cd app/
+TAG=v0.10.4 REPO_PREFIX=us-central1-docker.pkg.dev/google-samples/microservices-demo ./docs/releasing/make-release-artifacts.sh
+
+```
+
 ---
 
 ### 🛠️ Déploiement
@@ -142,6 +152,15 @@ terragrunt run --all apply
 ```bash
 cd live/prod/
 terragrunt run --all apply
+```
+
+**3. Configurer EKS**
+```bash
+aws eks update-kubeconfig --name hetic_friday_g2-prod --region eu-central-1
+
+kubectl apply -f ../../app/release/kubernetes-manifests.yaml
+
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
 ### 💥 Destruction (Nettoyage)
