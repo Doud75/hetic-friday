@@ -97,7 +97,7 @@ jobs:
 
           echo "Building and deploying with Skaffold..."
           skaffold config set --global local-cluster true
-          skaffold run --namespace=$NAMESPACE --tag=pr-${{ github.event.pull_request.number }}
+          skaffold run --profile=ci --namespace=$NAMESPACE --tag=pr-${{ github.event.pull_request.number }}
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
