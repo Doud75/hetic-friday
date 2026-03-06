@@ -1,13 +1,14 @@
-// Stress test progressif pour 90k connexions simultanées
+// Stress test progressif - 5000 VUs max
 // Lancer : k6 run load_test.js
 import http from "k6/http";
 import { sleep, check } from "k6";
 
 export const options = {
   stages: [
-    { duration: "3m", target: 5000 }, // Stress: 10000 → 20000 VUs (pic)
-    { duration: "3m", target: 5000 }, // Sustain: maintien à 10000 VUs
-    { duration: "1m", target: 0 }, // Shutdown: 2000 → 0 VUs
+    { duration: "15s", target: 50 },
+    { duration: "1m", target: 5000 },
+    { duration: "2m", target: 5000 },
+    { duration: "1s", target: 0 },
   ],
   thresholds: {
     http_req_duration: ["p(95)<2000"], // 95% des requêtes < 2s
@@ -15,11 +16,14 @@ export const options = {
   },
 };
 
-export default function () {
-  const url =
-    "http://a486a408bf1ad4a58a941652f5c7d993-1321088097.eu-central-1.elb.amazonaws.com/";
+const BASE_URL = __ENV.BASE_URL || "http://a00d025d61513404d9e74bdb63ce78dc-b9804b293783b47b.elb.eu-central-2.amazonaws.com";
 
-  const res = http.get(url);
+const params = {
+  headers: { "Connection": "keep-alive" },
+};
+
+export default function () {
+  const res = http.get(`${BASE_URL}/`, params);
 
   check(res, {
     "status is 200": (r) => r.status === 200,

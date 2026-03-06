@@ -1,5 +1,11 @@
 include "root" {
-  path = find_in_parent_folders("root.hcl")
+  path   = find_in_parent_folders("root.hcl")
+  expose = true
+}
+
+locals {
+  region = include.root.locals.region
+  azs    = ["${local.region}a", "${local.region}b", "${local.region}c"]
 }
 
 terraform {
@@ -10,7 +16,7 @@ inputs = {
   environment = "prod"
   
   vpc_cidr           = "10.0.0.0/16"
-  availability_zones = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
+  availability_zones = local.azs
   
   enable_nat_gateway_per_az = true
   

@@ -21,7 +21,6 @@ locals {
 }
 
 inputs = {
-  project_name       = "hetic_friday_g2"
   environment        = "prod"
 
   vpc_id             = dependency.vpc.outputs.vpc_id
