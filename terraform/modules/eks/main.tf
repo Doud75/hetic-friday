@@ -3,20 +3,14 @@ resource "aws_iam_role" "cluster" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "eks.amazonaws.com"
-        }
-      }
-    ]
+    Statement = [{
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+      Effect    = "Allow"
+      Principal = { Service = "eks.amazonaws.com" }
+    }]
   })
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-eks-cluster-role"
-  }
+  tags = { Name = "${var.project_name}-${var.environment}-eks-cluster-role" }
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_policy" {
@@ -24,24 +18,24 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
   role       = aws_iam_role.cluster.name
 }
 
-resource "aws_eks_cluster" "main" {
-  name     = "${var.project_name}-${var.environment}"
-  role_arn = aws_iam_role.cluster.arn
-  version  = var.cluster_version
+resource "aws_iam_role_policy_attachment" "cluster_compute_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSComputePolicy"
+  role       = aws_iam_role.cluster.name
+}
 
-  vpc_config {
-    subnet_ids              = var.private_subnet_ids
-    endpoint_private_access = true
-    endpoint_public_access  = true
-  }
+resource "aws_iam_role_policy_attachment" "cluster_block_storage_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSBlockStoragePolicy"
+  role       = aws_iam_role.cluster.name
+}
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-eks-cluster"
-  }
+resource "aws_iam_role_policy_attachment" "cluster_load_balancing_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSLoadBalancingPolicy"
+  role       = aws_iam_role.cluster.name
+}
 
-  depends_on = [
-    aws_iam_role_policy_attachment.cluster_policy
-  ]
+resource "aws_iam_role_policy_attachment" "cluster_networking_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSNetworkingPolicy"
+  role       = aws_iam_role.cluster.name
 }
 
 resource "aws_iam_role" "node" {
@@ -49,128 +43,95 @@ resource "aws_iam_role" "node" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
   })
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-eks-node-role"
-  }
+  tags = { Name = "${var.project_name}-${var.environment}-eks-node-role" }
 }
 
 resource "aws_iam_role_policy_attachment" "node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.node.name
-}
-
-resource "aws_iam_role_policy_attachment" "node_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodeMinimalPolicy"
   role       = aws_iam_role.node.name
 }
 
 resource "aws_iam_role_policy_attachment" "node_registry_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly"
   role       = aws_iam_role.node.name
 }
 
-resource "aws_eks_node_group" "system" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.project_name}-${var.environment}-system"
-  node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = var.private_subnet_ids
 
-  scaling_config {
-    desired_size = var.system_node_desired_size
-    min_size     = var.system_node_min_size
-    max_size     = var.system_node_max_size
+resource "aws_eks_cluster" "main" {
+  name     = "${var.project_name}-${var.environment}"
+  role_arn = aws_iam_role.cluster.arn
+  version  = var.cluster_version
+
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
   }
 
-  instance_types = var.system_instance_types
-  capacity_type  = "ON_DEMAND"
-
-  labels = {
-    role = "system"
+  compute_config {
+    enabled       = true
+    node_pools    = ["general-purpose", "system"]
+    node_role_arn = aws_iam_role.node.arn
   }
 
-  taint {
-    key    = "CriticalAddonsOnly"
-    value  = "true"
-    effect = "NO_SCHEDULE"
+  kubernetes_network_config {
+    elastic_load_balancing {
+      enabled = true
+    }
   }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-system-nodes"
+  storage_config {
+    block_storage {
+      enabled = true
+    }
   }
+
+  bootstrap_self_managed_addons = false
+
+  vpc_config {
+    subnet_ids              = var.private_subnet_ids
+    endpoint_private_access = true
+    endpoint_public_access  = true
+  }
+
+  tags = { Name = "${var.project_name}-${var.environment}-eks-cluster" }
 
   depends_on = [
-    aws_iam_role_policy_attachment.node_policy,
-    aws_iam_role_policy_attachment.node_cni_policy,
-    aws_iam_role_policy_attachment.node_registry_policy
+    aws_iam_role_policy_attachment.cluster_policy,
+    aws_iam_role_policy_attachment.cluster_compute_policy,
+    aws_iam_role_policy_attachment.cluster_block_storage_policy,
+    aws_iam_role_policy_attachment.cluster_load_balancing_policy,
+    aws_iam_role_policy_attachment.cluster_networking_policy,
   ]
 }
 
-resource "aws_eks_node_group" "application" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.project_name}-${var.environment}-application"
-  node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = var.private_subnet_ids
 
-  scaling_config {
-    desired_size = var.app_node_desired_size
-    min_size     = var.app_node_min_size
-    max_size     = var.app_node_max_size
-  }
+resource "aws_eks_access_entry" "users" {
+  for_each = { for u in var.map_users : u.userarn => u }
 
-  instance_types = var.app_instance_types
-  capacity_type  = var.enable_spot_instances ? "SPOT" : "ON_DEMAND"
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value.userarn
+  type          = "STANDARD"
 
-  labels = {
-    role = "application"
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-app-nodes"
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.node_policy,
-    aws_iam_role_policy_attachment.node_cni_policy,
-    aws_iam_role_policy_attachment.node_registry_policy
-  ]
+  depends_on = [aws_eks_cluster.main]
 }
 
-resource "aws_eks_addon" "vpc_cni" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "vpc-cni"
+resource "aws_eks_access_policy_association" "users_admin" {
+  for_each = { for u in var.map_users : u.userarn => u }
 
-  depends_on = [
-    aws_eks_node_group.system
-  ]
-}
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value.userarn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
-resource "aws_eks_addon" "coredns" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "coredns"
+  access_scope { type = "cluster" }
 
-  depends_on = [
-    aws_eks_node_group.system
-  ]
-}
-
-resource "aws_eks_addon" "kube_proxy" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "kube-proxy"
-
-  depends_on = [
-    aws_eks_node_group.system
-  ]
+  depends_on = [aws_eks_access_entry.users]
 }
 
 provider "kubernetes" {
@@ -182,28 +143,4 @@ provider "kubernetes" {
     command     = "aws"
     args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.main.name]
   }
-}
-
-resource "kubernetes_config_map" "aws_auth" {
-  metadata {
-    name      = "aws-auth"
-    namespace = "kube-system"
-  }
-
-  data = {
-    mapRoles = yamlencode([
-      {
-        rolearn  = aws_iam_role.node.arn
-        username = "system:node:{{EC2PrivateDNSName}}"
-        groups   = ["system:bootstrappers", "system:nodes"]
-      }
-    ])
-    mapUsers = yamlencode(var.map_users)
-  }
-
-  depends_on = [
-    aws_eks_cluster.main,
-    aws_eks_node_group.system,
-    aws_eks_node_group.application
-  ]
 }

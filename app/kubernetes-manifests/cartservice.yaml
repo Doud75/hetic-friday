@@ -30,6 +30,13 @@ spec:
     spec:
       serviceAccountName: cartservice
       terminationGracePeriodSeconds: 5
+      nodeSelector:
+        eks.amazonaws.com/capacityType: SPOT
+      tolerations:
+        - key: "eks.amazonaws.com/capacityType"
+          operator: "Equal"
+          value: "SPOT"
+          effect: "NoSchedule"
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000

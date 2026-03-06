@@ -17,7 +17,7 @@ export const options = {
 
 export default function () {
   const url =
-    "http://a486a408bf1ad4a58a941652f5c7d993-1321088097.eu-central-1.elb.amazonaws.com/";
+    "http://18.199.93.128/";
 
   const res = http.get(url);
 

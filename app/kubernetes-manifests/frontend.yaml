@@ -31,6 +31,13 @@ spec:
         sidecar.istio.io/rewriteAppHTTPProbers: "true"
     spec:
       serviceAccountName: frontend
+      nodeSelector:
+        eks.amazonaws.com/capacityType: SPOT
+      tolerations:
+        - key: "eks.amazonaws.com/capacityType"
+          operator: "Equal"
+          value: "SPOT"
+          effect: "NoSchedule"
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -127,6 +134,8 @@ metadata:
   name: frontend-external
   labels:
     app: frontend
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
 spec:
   type: LoadBalancer
   selector:

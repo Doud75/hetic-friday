@@ -158,7 +158,7 @@ terragrunt run --all apply
 ```bash
 aws eks update-kubeconfig --name hetic_friday_g2-prod --region eu-central-1
 
-kubectl apply -f ../../app/release/kubernetes-manifests.yaml
+kubectl apply -f app/release/kubernetes-manifests.yaml
 
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
