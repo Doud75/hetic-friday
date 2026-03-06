@@ -47,7 +47,7 @@ jobs:
       - name: Go Unit Tests
         timeout-minutes: 10
         run: |
-          for SERVICE in "shippingservice" "productcatalogservice"; do
+          for SERVICE in "shippingservice" "productcatalogservice" "frontend/validator"; do
             echo "testing $SERVICE..."
             pushd src/$SERVICE
             go test
@@ -84,7 +84,6 @@ jobs:
       - name: Build and Deploy to local kind cluster
         timeout-minutes: 20
         run: |
-          PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
           NAMESPACE="main-${GITHUB_SHA:0:8}"
           echo "Deploying to namespace: $NAMESPACE"
 
@@ -93,7 +92,7 @@ jobs:
 
           echo "Building and deploying with Skaffold..."
           skaffold config set --global local-cluster true
-          skaffold run --namespace=$NAMESPACE --tag=${GITHUB_SHA:0:8}
+          skaffold run --profile=ci --namespace=$NAMESPACE --tag=${GITHUB_SHA:0:8}
 
       - name: Wait For Pods
         timeout-minutes: 20
