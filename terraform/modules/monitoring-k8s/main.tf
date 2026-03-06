@@ -98,6 +98,24 @@ resource "helm_release" "kube_prometheus_stack" {
     value = var.environment == "prod" ? "15d" : "7d"
   }
 
+  # Prometheus scrape tous les ServiceMonitors/PodMonitors du cluster,
+  # pas seulement ceux générés par ce chart Helm.
+  # Indispensable pour monitorer les apps applicatives.
+  set {
+    name  = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues"
+    value = "false"
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues"
+    value = "false"
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues"
+    value = "false"
+  }
+
   # ─── NODE-EXPORTER ───
   # Toleration pour tourner aussi sur les system nodes (taint CriticalAddonsOnly)
 
