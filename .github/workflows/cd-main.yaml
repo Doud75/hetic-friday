@@ -1,0 +1,49 @@
+name: "Continuous Deployment - Production"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (e.g. v0.10.4)"
+        required: true
+        default: "v0.10.4"
+      repo_prefix:
+        description: "Image repo prefix"
+        required: true
+        default: "us-central1-docker.pkg.dev/google-samples/microservices-demo"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Regenerate kubernetes manifests
+        working-directory: app
+        run: |
+          TAG=${{ github.event.inputs.tag }} \
+          REPO_PREFIX=${{ github.event.inputs.repo_prefix }} \
+          ./docs/releasing/make-release-artifacts.sh
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name hetic_friday_g2-prod --region eu-central-1
+
+      - name: Deploy kubernetes manifests
+        run: |
+          kubectl apply -f app/release/kubernetes-manifests.yaml
+
+      - name: Deploy metrics-server
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml

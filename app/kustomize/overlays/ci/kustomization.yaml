@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../../base
+
+# Reduce all replicas to 1 for CI (single-node kind cluster)
+replicas:
+- name: frontend
+  count: 1
+- name: nginx-cache-proxy
+  count: 1
+- name: cartservice
+  count: 1
+- name: checkoutservice
+  count: 1
+- name: currencyservice
+  count: 1
+- name: productcatalogservice
+  count: 1
+- name: recommendationservice
+  count: 1
+- name: loadgenerator
+  count: 1

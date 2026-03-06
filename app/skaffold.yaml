@@ -92,6 +92,18 @@ profiles:
   - op: add
     path: /manifests/kustomize/paths/1
     value: kustomize/components/network-policies
+# "ci" profile is used in GitHub Actions CI for pull request tests.
+# It uses a kustomize overlay that reduces all replica counts to 1
+# so the single-node kind cluster has enough CPU to schedule all pods.
+#
+# Usage: skaffold run -p ci
+- name: ci
+  build:
+    platforms: ["linux/amd64"]
+  manifests:
+    kustomize:
+      paths:
+      - kustomize/overlays/ci
 ---
 apiVersion: skaffold/v3
 kind: Config

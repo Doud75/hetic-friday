@@ -22,6 +22,7 @@ resources:
 - emailservice.yaml
 - frontend.yaml
 - loadgenerator.yaml
+- nginx-cache-proxy.yaml
 - paymentservice.yaml
 - productcatalogservice.yaml
 - recommendationservice.yaml

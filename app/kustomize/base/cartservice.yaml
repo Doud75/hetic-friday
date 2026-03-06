@@ -52,7 +52,7 @@ spec:
               value: "redis-cart:6379"
           resources:
             requests:
-              cpu: 300m
+              cpu: 100m
               memory: 128Mi
             limits:
               cpu: 500m
