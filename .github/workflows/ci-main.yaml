@@ -154,7 +154,7 @@ jobs:
             while [[ "$REQUEST_COUNT" -lt "50" ]] && [[ "$RETRIES" -lt "20" ]]; do
                 sleep 5
                 REQUEST_COUNT=$(kubectl logs -l app=loadgenerator -n $NAMESPACE 2>/dev/null | grep Aggregated | awk '{print $2}' || echo "0")
-                ((RETRIES++))
+                RETRIES=$((RETRIES + 1))
             done
             # ensure there are no errors hitting endpoints
             ERROR_COUNT=$(kubectl logs -l app=loadgenerator -n $NAMESPACE 2>/dev/null | grep Aggregated | awk '{print $3}' | sed "s/[(][^)]*[)]//g" || echo "0")
