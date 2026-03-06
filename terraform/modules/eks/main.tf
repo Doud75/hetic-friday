@@ -5,7 +5,7 @@ resource "aws_iam_role" "cluster" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole"
+        Action = ["sts:AssumeRole", "sts:TagSession"]
         Effect = "Allow"
         Principal = {
           Service = "eks.amazonaws.com"
@@ -29,6 +29,30 @@ resource "aws_eks_cluster" "main" {
   role_arn = aws_iam_role.cluster.arn
   version  = var.cluster_version
 
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
+
+  bootstrap_self_managed_addons = false
+
+  compute_config {
+    enabled       = true
+    node_pools    = ["general-purpose"]
+    node_role_arn = aws_iam_role.node.arn
+  }
+
+  kubernetes_network_config {
+    elastic_load_balancing {
+      enabled = true
+    }
+  }
+
+  storage_config {
+    block_storage {
+      enabled = true
+    }
+  }
+
   vpc_config {
     subnet_ids              = var.private_subnet_ids
     endpoint_private_access = true
@@ -40,8 +64,32 @@ resource "aws_eks_cluster" "main" {
   }
 
   depends_on = [
-    aws_iam_role_policy_attachment.cluster_policy
+    aws_iam_role_policy_attachment.cluster_policy,
+    aws_iam_role_policy_attachment.cluster_compute_policy,
+    aws_iam_role_policy_attachment.cluster_networking_policy,
+    aws_iam_role_policy_attachment.cluster_storage_policy,
+    aws_iam_role_policy_attachment.cluster_lb_policy
   ]
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_compute_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSComputePolicy"
+  role       = aws_iam_role.cluster.name
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_networking_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSNetworkingPolicy"
+  role       = aws_iam_role.cluster.name
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_storage_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSBlockStoragePolicy"
+  role       = aws_iam_role.cluster.name
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_lb_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSLoadBalancingPolicy"
+  role       = aws_iam_role.cluster.name
 }
 
 resource "aws_iam_role" "node" {
@@ -80,130 +128,29 @@ resource "aws_iam_role_policy_attachment" "node_registry_policy" {
   role       = aws_iam_role.node.name
 }
 
-resource "aws_eks_node_group" "system" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.project_name}-${var.environment}-system"
-  node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = var.private_subnet_ids
 
-  scaling_config {
-    desired_size = var.system_node_desired_size
-    min_size     = var.system_node_min_size
-    max_size     = var.system_node_max_size
-  }
 
-  instance_types = var.system_instance_types
-  capacity_type  = "ON_DEMAND"
+# EKS Access Entries for human users (replaces the aws-auth ConfigMap mapUsers)
+# Note: the node role access entry is created automatically by EKS Auto Mode via compute_config.node_role_arn
+resource "aws_eks_access_entry" "users" {
+  for_each = { for u in var.map_users : u.username => u }
 
-  labels = {
-    role = "system"
-  }
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value.userarn
 
-  taint {
-    key    = "CriticalAddonsOnly"
-    value  = "true"
-    effect = "NO_SCHEDULE"
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-system-nodes"
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.node_policy,
-    aws_iam_role_policy_attachment.node_cni_policy,
-    aws_iam_role_policy_attachment.node_registry_policy
-  ]
+  depends_on = [aws_eks_cluster.main]
 }
 
-resource "aws_eks_node_group" "application" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.project_name}-${var.environment}-application"
-  node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = var.private_subnet_ids
+resource "aws_eks_access_policy_association" "users_admin" {
+  for_each = aws_eks_access_entry.users
 
-  scaling_config {
-    desired_size = var.app_node_desired_size
-    min_size     = var.app_node_min_size
-    max_size     = var.app_node_max_size
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value.principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
   }
 
-  instance_types = var.app_instance_types
-  capacity_type  = var.enable_spot_instances ? "SPOT" : "ON_DEMAND"
-
-  labels = {
-    role = "application"
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-app-nodes"
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.node_policy,
-    aws_iam_role_policy_attachment.node_cni_policy,
-    aws_iam_role_policy_attachment.node_registry_policy
-  ]
-}
-
-resource "aws_eks_addon" "vpc_cni" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "vpc-cni"
-
-  depends_on = [
-    aws_eks_node_group.system
-  ]
-}
-
-resource "aws_eks_addon" "coredns" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "coredns"
-
-  depends_on = [
-    aws_eks_node_group.system
-  ]
-}
-
-resource "aws_eks_addon" "kube_proxy" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "kube-proxy"
-
-  depends_on = [
-    aws_eks_node_group.system
-  ]
-}
-
-provider "kubernetes" {
-  host                   = aws_eks_cluster.main.endpoint
-  cluster_ca_certificate = base64decode(aws_eks_cluster.main.certificate_authority[0].data)
-
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.main.name]
-  }
-}
-
-resource "kubernetes_config_map" "aws_auth" {
-  metadata {
-    name      = "aws-auth"
-    namespace = "kube-system"
-  }
-
-  data = {
-    mapRoles = yamlencode([
-      {
-        rolearn  = aws_iam_role.node.arn
-        username = "system:node:{{EC2PrivateDNSName}}"
-        groups   = ["system:bootstrappers", "system:nodes"]
-      }
-    ])
-    mapUsers = yamlencode(var.map_users)
-  }
-
-  depends_on = [
-    aws_eks_cluster.main,
-    aws_eks_node_group.system,
-    aws_eks_node_group.application
-  ]
+  depends_on = [aws_eks_access_entry.users]
 }

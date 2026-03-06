@@ -53,7 +53,7 @@ resource "helm_release" "kube_prometheus_stack" {
   namespace  = kubernetes_namespace.monitoring.metadata[0].name
   version    = "72.6.2"
 
-  timeout = 600
+  timeout = 900
   wait    = true
 
   # ─── GRAFANA ───
@@ -82,6 +82,11 @@ resource "helm_release" "kube_prometheus_stack" {
   }
 
   # ─── PROMETHEUS ───
+
+  set {
+    name  = "prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName"
+    value = "ebs-auto"
+  }
 
   set {
     name  = "prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage"
