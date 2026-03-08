@@ -28,17 +28,5 @@ inputs = {
 
   cluster_version = "1.34"
 
-  system_node_desired_size = 2
-  system_node_min_size     = 2
-  system_node_max_size     = 5
-  system_instance_types    = ["t3.small"]
-
-  app_node_desired_size = 4
-  app_node_min_size     = 4
-  app_node_max_size     = 20
-  app_instance_types    = ["t3.small"]
-
-  enable_spot_instances = true
-
   map_users = local.secret_vars.inputs.map_users
 }
