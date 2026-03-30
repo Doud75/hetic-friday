@@ -47,6 +47,8 @@ spec:
         ports:
         - containerPort: 50051
         env:
+        - name: COLLECTOR_SERVICE_ADDR
+          value: "jaeger-collector.monitoring.svc.cluster.local:4317"
         - name: PORT
           value: "50051"
         - name: DISABLE_PROFILER

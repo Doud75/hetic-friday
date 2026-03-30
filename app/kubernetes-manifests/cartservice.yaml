@@ -48,6 +48,8 @@ spec:
           ports:
             - containerPort: 7070
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
             - name: REDIS_ADDR
               value: "redis-cart:6379"
           resources:
