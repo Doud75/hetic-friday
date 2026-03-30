@@ -149,7 +149,7 @@ resource "helm_release" "kube_prometheus_stack" {
 
   set {
     name  = "prometheus.prometheusSpec.externalUrl"
-    value = "/prometheus"
+    value = "http://localhost/prometheus"
   }
 
   set {
@@ -167,7 +167,7 @@ resource "helm_release" "kube_prometheus_stack" {
   # AlertManager sub-path /alertmanager pour ALB
   set {
     name  = "alertmanager.alertmanagerSpec.externalUrl"
-    value = "/alertmanager"
+    value = "http://localhost/alertmanager"
   }
 
   set {
