@@ -8,6 +8,12 @@ variable "environment" {
   type        = string
 }
 
+variable "region" {
+  description = "Région AWS"
+  type        = string
+  default     = "eu-central-1"
+}
+
 variable "monthly_budget_limit" {
   description = "Limite mensuelle totale en USD"
   type        = string
