@@ -39,7 +39,10 @@ resource "aws_db_instance" "grp2dbinstance" {
   engine_version    = "17.6"
   allocated_storage = 20
   storage_type      = "gp2"
-  storage_encrypted = true # Encryption at rest (AES-256, clé KMS managée par AWS)
+  # NOTE: storage_encrypted ne peut pas être activé sur une instance existante
+  # sans la détruire et recréer (perte de données). La migration vers une instance
+  # chiffrée nécessite un snapshot → copie chiffrée → restore.
+  # Voir docs/security-hardening.md pour le plan de migration.
   multi_az          = true
   db_name           = "grp2db"
   username          = var.db_username
