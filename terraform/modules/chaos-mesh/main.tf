@@ -86,99 +86,14 @@ resource "helm_release" "chaos_mesh" {
   depends_on = [kubernetes_namespace.chaos_mesh]
 }
 
-
 # ──────────────────────────────────────────────
 # EXPÉRIENCES DE CHAOS PRÉ-CONFIGURÉES
-# Prêtes à être appliquées pendant les tests
 # ──────────────────────────────────────────────
+# Les expériences utilisent des CRDs installées par le Helm chart Chaos Mesh.
+# Elles ne peuvent PAS être gérées par Terraform dans le même apply car les CRDs
+# n'existent pas encore au moment du 'plan' (erreur: "no matches for kind PodChaos").
+#
+# → Les expériences sont dans : app/chaos-experiments/
+# → À appliquer APRÈS le premier 'terragrunt apply' de ce module :
+#     kubectl apply -f app/chaos-experiments/ -n chaos-mesh
 
-# Expérience 1 : Tuer un pod aléatoirement (PodChaos)
-resource "kubernetes_manifest" "pod_kill_experiment" {
-  manifest = {
-    apiVersion = "chaos-mesh.org/v1alpha1"
-    kind       = "PodChaos"
-    metadata = {
-      name      = "pod-kill-random"
-      namespace = kubernetes_namespace.chaos_mesh.metadata[0].name
-      annotations = {
-        description = "Tue un pod aléatoire dans le namespace cible pour tester le self-healing Kubernetes"
-      }
-    }
-    spec = {
-      action = "pod-kill"
-      mode   = "one"
-      selector = {
-        namespaces = [var.target_namespace]
-      }
-      duration = "30s"
-    }
-  }
-
-  depends_on = [helm_release.chaos_mesh]
-}
-
-# Expérience 2 : Injection de latence réseau (NetworkChaos)
-resource "kubernetes_manifest" "network_delay_experiment" {
-  manifest = {
-    apiVersion = "chaos-mesh.org/v1alpha1"
-    kind       = "NetworkChaos"
-    metadata = {
-      name      = "network-delay-200ms"
-      namespace = kubernetes_namespace.chaos_mesh.metadata[0].name
-      annotations = {
-        description = "Ajoute 200ms de latence réseau pour simuler une dégradation de performance inter-services"
-      }
-    }
-    spec = {
-      action = "delay"
-      mode   = "all"
-      selector = {
-        namespaces = [var.target_namespace]
-        labelSelectors = {
-          app = "frontend"
-        }
-      }
-      delay = {
-        latency     = "200ms"
-        jitter      = "50ms"
-        correlation = "50"
-      }
-      duration = "2m"
-    }
-  }
-
-  depends_on = [helm_release.chaos_mesh]
-}
-
-# Expérience 3 : Stress CPU (StressChaos)
-resource "kubernetes_manifest" "cpu_stress_experiment" {
-  manifest = {
-    apiVersion = "chaos-mesh.org/v1alpha1"
-    kind       = "StressChaos"
-    metadata = {
-      name      = "cpu-stress-frontend"
-      namespace = kubernetes_namespace.chaos_mesh.metadata[0].name
-      annotations = {
-        description = "Stress CPU sur le frontend pour vérifier que l'HPA réagit correctement"
-      }
-    }
-    spec = {
-      mode = "one"
-      selector = {
-        namespaces = [var.target_namespace]
-        labelSelectors = {
-          app = "frontend"
-        }
-      }
-      stressors = {
-        cpu = {
-          workers = 2
-          load    = 80
-        }
-      }
-      duration = "3m"
-    }
-  }
-
-  depends_on = [helm_release.chaos_mesh]
-}
