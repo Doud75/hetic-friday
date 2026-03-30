@@ -23,5 +23,5 @@ inputs = {
   cluster_endpoint                   = dependency.eks.outputs.cluster_endpoint
   cluster_certificate_authority_data = dependency.eks.outputs.cluster_certificate_authority_data
 
-  target_namespace = "hetic-friday"
+  target_namespace = "default"
 }

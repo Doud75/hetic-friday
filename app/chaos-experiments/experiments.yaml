@@ -10,7 +10,7 @@ spec:
   mode: one
   selector:
     namespaces:
-      - hetic-friday
+      - default
   duration: "30s"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
@@ -25,7 +25,7 @@ spec:
   mode: all
   selector:
     namespaces:
-      - hetic-friday
+      - default
     labelSelectors:
       app: frontend
   delay:
@@ -45,7 +45,7 @@ spec:
   mode: one
   selector:
     namespaces:
-      - hetic-friday
+      - default
     labelSelectors:
       app: frontend
   stressors:
