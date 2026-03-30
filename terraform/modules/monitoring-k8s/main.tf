@@ -96,7 +96,7 @@ resource "helm_release" "kube_prometheus_stack" {
 
   set {
     name  = "prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName"
-    value = "ebs-gp3"
+    value = "ebs-auto"
   }
 
   set {
