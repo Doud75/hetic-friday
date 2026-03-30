@@ -130,6 +130,20 @@ resource "aws_iam_role_policy_attachment" "node_registry_policy" {
 
 
 
+data "tls_certificate" "eks_oidc" {
+  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-eks-oidc"
+  }
+}
+
 # EKS Access Entries for human users (replaces the aws-auth ConfigMap mapUsers)
 # Note: the node role access entry is created automatically by EKS Auto Mode via compute_config.node_role_arn
 resource "aws_eks_access_entry" "users" {

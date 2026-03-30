@@ -62,3 +62,8 @@ output "db_subnets" {
   description = "Liste des subnets privés DB"
   value       = aws_subnet.data[*].id
 }
+
+output "private_route_table_ids" {
+  description = "IDs des route tables privées (une par AZ)"
+  value       = aws_route_table.private[*].id
+}

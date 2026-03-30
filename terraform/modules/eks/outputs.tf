@@ -27,3 +27,8 @@ output "cluster_oidc_issuer_url" {
   description = "URL de l'OIDC provider (pour IRSA)"
   value       = aws_eks_cluster.main.identity[0].oidc[0].issuer
 }
+
+output "oidc_provider_arn" {
+  description = "ARN de l'OIDC provider IAM (pour IRSA)"
+  value       = aws_iam_openid_connect_provider.eks.arn
+}

@@ -1,3 +1,27 @@
+resource "aws_secretsmanager_secret" "rds_credentials" {
+  name                    = "${var.project_name}-${var.environment}-rds-credentials"
+  recovery_window_in_days = 0
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-rds-credentials"
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "rds_credentials" {
+  secret_id = aws_secretsmanager_secret.rds_credentials.id
+
+  secret_string = jsonencode({
+    RDS_HOST      = aws_db_instance.grp2dbinstance.address
+    RDS_PORT      = "5432"
+    RDS_USER      = var.db_username
+    RDS_PASSWORD  = var.db_password
+    RDS_DB_NAME   = aws_db_instance.grp2dbinstance.db_name
+    RDS_TABLE_NAME = "products"
+    RDS_SSLMODE   = "require"
+  })
+}
+
 resource "aws_db_subnet_group" "rdssubnetgroup" {
   name       = "grp2-db-subnet-group"
   subnet_ids = var.subnets
