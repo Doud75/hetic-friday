@@ -78,3 +78,56 @@ jobs:
       - name: Deploy metrics-server
         run: |
           kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+      - name: Update ALB Target Groups with new pod IPs
+        run: |
+          # Récupérer les ARNs par le nom (stable, déterministe, ne change pas après destroy/apply)
+          FRONTEND_TG_ARN=$(aws elbv2 describe-target-groups \
+            --names hetic-friday-prod-frontend-tg \
+            --region eu-central-1 \
+            --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+          GRAFANA_TG_ARN=$(aws elbv2 describe-target-groups \
+            --names hetic-friday-prod-grafana-tg \
+            --region eu-central-1 \
+            --query 'TargetGroups[0].TargetGroupArn' --output text)
+          # Attendre que les pods soient ready
+          kubectl rollout status deployment/frontend -n hetic-friday --timeout=120s
+
+          # Récupérer les IPs des pods
+          FRONTEND_IP=$(kubectl get pod -n hetic-friday -l app=frontend \
+            -o jsonpath='{.items[0].status.podIP}')
+          GRAFANA_IP=$(kubectl get pod -n monitoring \
+            -l app.kubernetes.io/name=grafana \
+            -o jsonpath='{.items[0].status.podIP}')
+
+          echo "Frontend pod IP: $FRONTEND_IP"
+          echo "Grafana pod IP:  $GRAFANA_IP"
+
+          # Dé-enregistrer les anciennes cibles frontend
+          EXISTING=$(aws elbv2 describe-target-health \
+            --target-group-arn $FRONTEND_TG_ARN \
+            --region eu-central-1 \
+            --query 'TargetHealthDescriptions[*].Target' --output json)
+          if [ "$EXISTING" != "[]" ]; then
+            aws elbv2 deregister-targets \
+              --target-group-arn $FRONTEND_TG_ARN \
+              --targets $(echo $EXISTING | jq -r '.[] | "Id=\(.Id),Port=\(.Port)"' | tr '\n' ' ') \
+              --region eu-central-1
+            sleep 10
+          fi
+
+          # Enregistrer les nouvelles IPs
+          aws elbv2 register-targets \
+            --target-group-arn $FRONTEND_TG_ARN \
+            --targets Id=$FRONTEND_IP,Port=8080 \
+            --region eu-central-1
+
+          aws elbv2 register-targets \
+            --target-group-arn $GRAFANA_TG_ARN \
+            --targets Id=$GRAFANA_IP,Port=3000 \
+            --region eu-central-1
+
+          echo "✅ ALB Target Groups mis à jour"
+          echo "Frontend: $FRONTEND_IP:8080"
+          echo "Grafana:  $GRAFANA_IP:3000"
