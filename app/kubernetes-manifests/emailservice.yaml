@@ -43,12 +43,14 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: emailservice
+        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice:v0.10.4
         ports:
         - containerPort: 8080
         env:
         - name: COLLECTOR_SERVICE_ADDR
           value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
+          value: "1"
         - name: PORT
           value: "8080"
         - name: DISABLE_PROFILER
