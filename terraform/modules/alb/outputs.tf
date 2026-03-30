@@ -22,3 +22,8 @@ output "alb_security_group_id" {
   description = "ID du security group de l'ALB"
   value       = aws_security_group.alb.id
 }
+
+output "waf_web_acl_arn" {
+  description = "ARN du WAF Web ACL associé à l'ALB"
+  value       = aws_wafv2_web_acl.main.arn
+}

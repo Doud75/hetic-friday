@@ -47,3 +47,9 @@ variable "cluster_certificate_authority_data" {
   description = "CA du cluster EKS (base64) — pour le provider Kubernetes"
   type        = string
 }
+
+variable "waf_whitelisted_ips" {
+  description = "Liste d'IPs (CIDR) exemptes du rate-limiting WAF (load test k6, equipe)"
+  type        = list(string)
+  default     = []
+}

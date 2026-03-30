@@ -256,3 +256,175 @@ resource "kubernetes_manifest" "grafana_tgb" {
     }
   }
 }
+
+# ──────────────────────────────────────────────
+# WAF v2 — Web Application Firewall
+# Protège l'ALB avec des règles managées AWS
+# et un rate-limiting par IP.
+# ──────────────────────────────────────────────
+
+# IP Set pour les adresses whitelistées (load test k6, équipe...)
+# Ces IPs bypasse le rate limiting mais PAS les règles de sécurité.
+resource "aws_wafv2_ip_set" "whitelist" {
+  name               = "${var.project_name}-${var.environment}-whitelist"
+  description        = "Whitelisted IPs for load testing"
+  scope              = "REGIONAL"
+  ip_address_version = "IPV4"
+  addresses          = var.waf_whitelisted_ips
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-whitelist"
+    environment = var.environment
+    managed-by  = "terraform"
+  }
+}
+
+resource "aws_wafv2_web_acl" "main" {
+  name        = "${var.project_name}-${var.environment}-waf"
+  description = "WAF for ALB ${var.project_name}-${var.environment}"
+  scope       = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  # ── Règle 0 : Whitelist (bypass rate-limit) ──
+  # Les IPs whitelistées passent le rate-limit mais restent
+  # soumises aux règles de sécurité (XSS, SQLi, etc.)
+  dynamic "rule" {
+    for_each = length(var.waf_whitelisted_ips) > 0 ? [1] : []
+    content {
+      name     = "whitelist-allow"
+      priority = 0
+
+      action {
+        allow {}
+      }
+
+      statement {
+        ip_set_reference_statement {
+          arn = aws_wafv2_ip_set.whitelist.arn
+        }
+      }
+
+      visibility_config {
+        sampled_requests_enabled   = true
+        cloudwatch_metrics_enabled = true
+        metric_name                = "${var.project_name}-${var.environment}-whitelist"
+      }
+    }
+  }
+
+  # ── Règle 1 : Rate Limiting ──
+  # Bloque les IPs qui envoient plus de 2000 requêtes en 5 minutes
+  rule {
+    name     = "rate-limit"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 2000
+        aggregate_key_type = "IP"
+      }
+    }
+
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.project_name}-${var.environment}-rate-limit"
+    }
+  }
+
+  # ── Règle 2 : AWS Core Rule Set (CRS) ──
+  # Protège contre les attaques web courantes (XSS, traversal, injections...)
+  rule {
+    name     = "aws-managed-common"
+    priority = 2
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesCommonRuleSet"
+      }
+    }
+
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.project_name}-${var.environment}-common-rules"
+    }
+  }
+
+  # ── Règle 3 : Known Bad Inputs ──
+  # Bloque les requêtes connues comme malveillantes (Log4j, etc.)
+  rule {
+    name     = "aws-managed-bad-inputs"
+    priority = 3
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+      }
+    }
+
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.project_name}-${var.environment}-bad-inputs"
+    }
+  }
+
+  # ── Règle 4 : SQL Injection ──
+  rule {
+    name     = "aws-managed-sqli"
+    priority = 4
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesSQLiRuleSet"
+      }
+    }
+
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.project_name}-${var.environment}-sqli"
+    }
+  }
+
+  visibility_config {
+    sampled_requests_enabled   = true
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.project_name}-${var.environment}-waf"
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-waf"
+    environment = var.environment
+    managed-by  = "terraform"
+  }
+}
+
+# ── Association WAF → ALB ──
+resource "aws_wafv2_web_acl_association" "alb" {
+  resource_arn = aws_lb.main.arn
+  web_acl_arn  = aws_wafv2_web_acl.main.arn
+}

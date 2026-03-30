@@ -38,4 +38,10 @@ inputs = {
   cluster_name                       = dependency.eks.outputs.cluster_name
   cluster_endpoint                   = dependency.eks.outputs.cluster_endpoint
   cluster_certificate_authority_data = dependency.eks.outputs.cluster_certificate_authority_data
+
+  # IPs exemptes du rate-limiting WAF (load test k6, equipe)
+  # Ajouter les IPs au format CIDR. Ces IPs restent soumises aux regles de securite (XSS, SQLi...).
+  waf_whitelisted_ips = [
+    "92.184.117.228/32"  # equipe - IP actuelle
+  ]
 }
