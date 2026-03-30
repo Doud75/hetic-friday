@@ -145,34 +145,11 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "NoSchedule"
   }
 
-  # ─── PROMETHEUS sub-path /prometheus pour ALB ───
-
-  set {
-    name  = "prometheus.prometheusSpec.externalUrl"
-    value = "http://localhost/prometheus"
-  }
-
-  set {
-    name  = "prometheus.prometheusSpec.routePrefix"
-    value = "/prometheus"
-  }
-
   # ─── ALERTMANAGER ───
 
   set {
     name  = "alertmanager.enabled"
     value = "true"
-  }
-
-  # AlertManager sub-path /alertmanager pour ALB
-  set {
-    name  = "alertmanager.alertmanagerSpec.externalUrl"
-    value = "http://localhost/alertmanager"
-  }
-
-  set {
-    name  = "alertmanager.alertmanagerSpec.routePrefix"
-    value = "/alertmanager"
   }
 
   depends_on = [kubernetes_namespace.monitoring]
