@@ -145,11 +145,34 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "NoSchedule"
   }
 
+  # ─── PROMETHEUS sub-path /prometheus pour ALB ───
+
+  set {
+    name  = "prometheus.prometheusSpec.externalUrl"
+    value = "/prometheus"
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.routePrefix"
+    value = "/prometheus"
+  }
+
   # ─── ALERTMANAGER ───
 
   set {
     name  = "alertmanager.enabled"
     value = "true"
+  }
+
+  # AlertManager sub-path /alertmanager pour ALB
+  set {
+    name  = "alertmanager.alertmanagerSpec.externalUrl"
+    value = "/alertmanager"
+  }
+
+  set {
+    name  = "alertmanager.alertmanagerSpec.routePrefix"
+    value = "/alertmanager"
   }
 
   depends_on = [kubernetes_namespace.monitoring]
@@ -212,6 +235,17 @@ resource "helm_release" "jaeger" {
     name  = "allInOne.extraEnv[0].value"
     value = "10000"
     type  = "string"
+  }
+
+  # Jaeger sub-path /jaeger pour accès via ALB
+  set {
+    name  = "allInOne.extraEnv[1].name"
+    value = "QUERY_BASE_PATH"
+  }
+
+  set {
+    name  = "allInOne.extraEnv[1].value"
+    value = "/jaeger"
   }
 
   depends_on = [kubernetes_namespace.monitoring]
