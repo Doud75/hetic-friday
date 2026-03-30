@@ -163,6 +163,17 @@ kubectl apply -f ../../app/release/kubernetes-manifests.yaml
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
+**4. Seed de la base produits (première installation uniquement)**
+
+À exécuter après que le module `eso` a déployé le secret `rds-credentials` dans le cluster :
+
+```bash
+kubectl apply -f app/kubernetes-manifests/seed-products.yaml
+kubectl wait --for=condition=complete job/seed-products --timeout=120s
+```
+
+Le Job se nettoie automatiquement 5 minutes après succès. Il est idempotent : relancer la commande ne duplique pas les données.
+
 ### 💥 Destruction (Nettoyage)
 
 **1. Détruire les ressources AWS**

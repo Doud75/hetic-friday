@@ -4,13 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag to deploy (e.g. v0.10.4)"
+        description: "Image tag to deploy for Google services (e.g. v0.10.4)"
         required: true
         default: "v0.10.4"
       repo_prefix:
-        description: "Image repo prefix"
+        description: "Image repo prefix for Google services"
         required: true
         default: "us-central1-docker.pkg.dev/google-samples/microservices-demo"
+      productcatalog_tag:
+        description: "Tag ECR à déployer pour productcatalogservice (laisser vide pour utiliser le dernier build)"
+        required: false
 
 jobs:
   deploy:
@@ -32,6 +35,34 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-central-1
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve productcatalogservice image tag
+        id: resolve-tag
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          INPUT_TAG: ${{ github.event.inputs.productcatalog_tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG=$(aws ecr describe-images \
+              --repository-name hetic_friday_g2-prod-productcatalogservice \
+              --query 'sort_by(imageDetails, &imagePushedAt)[-1].imageTags[0]' \
+              --output text)
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Deploying productcatalogservice:$TAG"
+
+      - name: Patch productcatalogservice image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          ECR_IMAGE="$ECR_REGISTRY/hetic_friday_g2-prod-productcatalogservice:${{ steps.resolve-tag.outputs.tag }}"
+          sed -i "s|image: .*/productcatalogservice:.*|image: $ECR_IMAGE|" app/release/kubernetes-manifests.yaml
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v4

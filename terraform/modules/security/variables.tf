@@ -24,3 +24,8 @@ variable "vpc_id" {
   description = "ID du VPC"
   type        = string
 }
+
+variable "private_subnet_cidrs" {
+  description = "CIDR blocks des subnets privés (nœuds EKS) autorisés à accéder à la base de données"
+  type        = list(string)
+}

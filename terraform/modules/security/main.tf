@@ -101,11 +101,11 @@ resource "aws_security_group" "sg_db" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "MySQL depuis SG-App"
-    from_port       = 3306
-    to_port         = 3306
-    protocol        = "tcp"
-    security_groups = [aws_security_group.sg_app.id]
+    description = "PostgreSQL depuis les noeuds EKS (subnets prives)"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = var.private_subnet_cidrs
   }
 
   egress {
