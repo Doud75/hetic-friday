@@ -78,7 +78,7 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push productcatalogservice
+      - name: Build productcatalogservice image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: sha-${{ github.sha }}
@@ -86,6 +86,21 @@ jobs:
           docker build \
             -t $ECR_REGISTRY/hetic_friday_g2-prod-productcatalogservice:$IMAGE_TAG \
             app/src/productcatalogservice
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.ecr-login.outputs.registry }}/hetic_friday_g2-prod-productcatalogservice:sha-${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Push productcatalogservice to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
           docker push $ECR_REGISTRY/hetic_friday_g2-prod-productcatalogservice:$IMAGE_TAG
 
   deployment-tests:
