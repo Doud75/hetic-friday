@@ -157,3 +157,227 @@ resource "aws_route_table_association" "data" {
   subnet_id      = aws_subnet.data[count.index].id
   route_table_id = aws_route_table.data.id
 }
+
+
+# ──────────────────────────────────────────────
+# NETWORK ACLs — Défense en profondeur (stateless)
+# Couche de sécurité supplémentaire aux Security Groups
+# ──────────────────────────────────────────────
+
+# NACL Public — autorise HTTP/HTTPS entrant + éphémères sortants
+resource "aws_network_acl" "public" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = aws_subnet.public[*].id
+
+  # HTTP entrant
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 80
+    to_port    = 80
+  }
+
+  # HTTPS entrant
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 110
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 443
+    to_port    = 443
+  }
+
+  # Ports éphémères entrants (réponses des connexions sortantes)
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 120
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 1024
+    to_port    = 65535
+  }
+
+  # SSH entrant (bastion)
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 130
+    action     = "allow"
+    cidr_block = var.vpc_cidr
+    from_port  = 22
+    to_port    = 22
+  }
+
+  # Tout le trafic sortant
+  egress {
+    protocol   = "-1"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-public-nacl"
+  }
+}
+
+# NACL Private — trafic depuis le VPC + NAT
+resource "aws_network_acl" "private" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = aws_subnet.private[*].id
+
+  # Tout le trafic depuis le VPC
+  ingress {
+    protocol   = "-1"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = var.vpc_cidr
+    from_port  = 0
+    to_port    = 0
+  }
+
+  # Ports éphémères entrants (réponses NAT — téléchargement images Docker, etc.)
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 110
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 1024
+    to_port    = 65535
+  }
+
+  # Tout le trafic sortant (vers NAT, vers le VPC)
+  egress {
+    protocol   = "-1"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-private-nacl"
+  }
+}
+
+# NACL Data — uniquement PostgreSQL depuis le Private Layer
+resource "aws_network_acl" "data" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = aws_subnet.data[*].id
+
+  # PostgreSQL depuis les subnets privés uniquement
+  dynamic "ingress" {
+    for_each = var.private_subnet_cidrs
+    content {
+      protocol   = "tcp"
+      rule_no    = 100 + ingress.key
+      action     = "allow"
+      cidr_block = ingress.value
+      from_port  = 5432
+      to_port    = 5432
+    }
+  }
+
+  # Ports éphémères entrants (réponses)
+  dynamic "ingress" {
+    for_each = var.private_subnet_cidrs
+    content {
+      protocol   = "tcp"
+      rule_no    = 200 + ingress.key
+      action     = "allow"
+      cidr_block = ingress.value
+      from_port  = 1024
+      to_port    = 65535
+    }
+  }
+
+  # Réponses vers les subnets privés uniquement
+  dynamic "egress" {
+    for_each = var.private_subnet_cidrs
+    content {
+      protocol   = "tcp"
+      rule_no    = 100 + egress.key
+      action     = "allow"
+      cidr_block = egress.value
+      from_port  = 1024
+      to_port    = 65535
+    }
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-data-nacl"
+  }
+}
+
+
+# ──────────────────────────────────────────────
+# VPC FLOW LOGS — Audit réseau et debugging
+# ──────────────────────────────────────────────
+
+resource "aws_flow_log" "main" {
+  vpc_id               = aws_vpc.main.id
+  traffic_type         = "ALL"
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.flow_log.arn
+  iam_role_arn         = aws_iam_role.flow_log.arn
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-vpc-flow-log"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "flow_log" {
+  name              = "/aws/vpc/flow-log/${var.project_name}-${var.environment}"
+  retention_in_days = var.environment == "prod" ? 30 : 7
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-flow-log-group"
+  }
+}
+
+resource "aws_iam_role" "flow_log" {
+  name = "${var.project_name}-${var.environment}-vpc-flow-log-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-vpc-flow-log-role"
+  }
+}
+
+resource "aws_iam_role_policy" "flow_log" {
+  name = "${var.project_name}-${var.environment}-vpc-flow-log-policy"
+  role = aws_iam_role.flow_log.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
