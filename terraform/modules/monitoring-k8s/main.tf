@@ -75,6 +75,17 @@ resource "helm_release" "kube_prometheus_stack" {
     value = var.environment == "prod" ? "LoadBalancer" : "ClusterIP"
   }
 
+  # Sous-chemin /grafana pour accès via ALB
+  set {
+    name  = "grafana.grafana\\.ini.server.root_url"
+    value = "%(protocol)s://%(domain)s/grafana"
+  }
+
+  set {
+    name  = "grafana.grafana\\.ini.server.serve_from_sub_path"
+    value = "true"
+  }
+
   # Dashboards Kubernetes pré-installés
   set {
     name  = "grafana.defaultDashboardsEnabled"
