@@ -200,6 +200,7 @@ resource "helm_release" "jaeger" {
   set {
     name  = "allInOne.extraEnv[0].value"
     value = "10000"
+    type  = "string"
   }
 
   depends_on = [kubernetes_namespace.monitoring]
