@@ -1,0 +1,34 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: pod-kill-random
+  namespace: chaos-mesh
+  annotations:
+    description: "Tue un pod aléatoire dans le namespace cible pour tester le self-healing Kubernetes"
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - default
+  duration: "30s"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-stress-frontend
+  namespace: chaos-mesh
+  annotations:
+    description: "Stress CPU sur le frontend pour vérifier que l'HPA réagit correctement"
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app: frontend
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: "3m"
