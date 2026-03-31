@@ -19,7 +19,7 @@ metadata:
   labels:
     app: currencyservice
 spec:
-  replicas: 3
+  replicas: 5
   selector:
     matchLabels:
       app: currencyservice
@@ -65,11 +65,11 @@ spec:
               port: 7000
           resources:
             requests:
-              cpu: 300m
-              memory: 128Mi
-            limits:
-              cpu: 600m
+              cpu: 500m
               memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
