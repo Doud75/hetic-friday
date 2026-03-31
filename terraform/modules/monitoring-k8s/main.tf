@@ -68,16 +68,27 @@ resource "helm_release" "kube_prometheus_stack" {
     value = var.grafana_admin_password
   }
 
-  # Dev: ClusterIP (accès via port-forward → localhost:3000)
-  # Prod: LoadBalancer (AWS crée un ELB → URL publique)
+  # Toujours en ClusterIP — l'ALB Terraform gère l'exposition publique
+  # (EKS Auto Mode ne peut pas créer de LoadBalancer sur ce compte)
   set {
     name  = "grafana.service.type"
-    value = var.environment == "prod" ? "LoadBalancer" : "ClusterIP"
+    value = "ClusterIP"
   }
 
   # Dashboards Kubernetes pré-installés
   set {
     name  = "grafana.defaultDashboardsEnabled"
+    value = "true"
+  }
+
+  # Subpath — Grafana accessible via ALB port 80 sur /grafana
+  set {
+    name  = "grafana.env.GF_SERVER_ROOT_URL"
+    value = "%(protocol)s://%(domain)s/grafana/"
+  }
+
+  set {
+    name  = "grafana.env.GF_SERVER_SERVE_FROM_SUB_PATH"
     value = "true"
   }
 

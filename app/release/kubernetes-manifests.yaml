@@ -783,18 +783,15 @@ spec:
           emptyDir:
             sizeLimit: 512Mi
 ---
-# Service public : remplace frontend-external
+# Service internal : exposed via ALB (Terraform) + TargetGroupBinding
 apiVersion: v1
 kind: Service
 metadata:
   name: nginx-cache-proxy
   labels:
     app: nginx-cache-proxy
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: nginx-cache-proxy
   ports:
