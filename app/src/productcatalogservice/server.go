@@ -27,6 +27,7 @@ import (
 
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/productcatalogservice/genproto"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	"cloud.google.com/go/profiler"
@@ -140,8 +141,12 @@ func run(port string) string {
 		log.Fatalf("could not parse product catalog: %v", err)
 	}
 
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("hipstershop.ProductCatalogService", healthpb.HealthCheckResponse_SERVING)
+
 	pb.RegisterProductCatalogServiceServer(srv, svc)
-	healthpb.RegisterHealthServer(srv, svc)
+	healthpb.RegisterHealthServer(srv, healthServer)
 	go srv.Serve(listener)
 
 	return listener.Addr().String()
