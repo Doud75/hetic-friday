@@ -44,11 +44,15 @@ spec:
                 - ALL
             privileged: false
             readOnlyRootFilesystem: true
-          image: currencyservice
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice:v0.10.4
           ports:
             - name: grpc
               containerPort: 7000
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
+          value: "1"
             - name: PORT
               value: "7000"
             - name: DISABLE_PROFILER

@@ -44,10 +44,14 @@ spec:
                 - ALL
             privileged: false
             readOnlyRootFilesystem: true
-          image: cartservice
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice:v0.10.4
           ports:
             - containerPort: 7070
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
+          value: "1"
             - name: REDIS_ADDR
               value: "redis-cart:6379"
           resources:

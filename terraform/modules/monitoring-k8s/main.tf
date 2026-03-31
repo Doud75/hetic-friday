@@ -75,6 +75,17 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "ClusterIP"
   }
 
+  # Sous-chemin /grafana pour accès via ALB
+  set {
+    name  = "grafana.grafana\\.ini.server.root_url"
+    value = "%(protocol)s://%(domain)s/grafana"
+  }
+
+  set {
+    name  = "grafana.grafana\\.ini.server.serve_from_sub_path"
+    value = "true"
+  }
+
   # Dashboards Kubernetes pré-installés
   set {
     name  = "grafana.defaultDashboardsEnabled"
@@ -153,4 +164,182 @@ resource "helm_release" "kube_prometheus_stack" {
   }
 
   depends_on = [kubernetes_namespace.monitoring]
+}
+
+
+# ──────────────────────────────────────────────
+# JAEGER — Tracing distribué
+# Permet de suivre une requête à travers les 11 microservices
+# ──────────────────────────────────────────────
+
+resource "helm_release" "jaeger" {
+  name       = "jaeger"
+  repository = "https://jaegertracing.github.io/helm-charts"
+  chart      = "jaeger"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  version    = "3.4.1"
+
+  timeout = 600
+  wait    = true
+
+  # Mode all-in-one pour réduire les coûts (1 seul pod)
+  set {
+    name  = "provisionDataStore.cassandra"
+    value = "false"
+  }
+
+  set {
+    name  = "allInOne.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "agent.enabled"
+    value = "false"
+  }
+
+  set {
+    name  = "collector.enabled"
+    value = "false"
+  }
+
+  set {
+    name  = "query.enabled"
+    value = "false"
+  }
+
+  # Stockage in-memory (suffisant pour le projet, pas de Cassandra/Elasticsearch)
+  set {
+    name  = "storage.type"
+    value = "memory"
+  }
+
+  set {
+    name  = "allInOne.extraEnv[0].name"
+    value = "MEMORY_MAX_TRACES"
+  }
+
+  set {
+    name  = "allInOne.extraEnv[0].value"
+    value = "10000"
+    type  = "string"
+  }
+
+  # Jaeger sub-path /jaeger pour accès via ALB
+  set {
+    name  = "allInOne.extraEnv[1].name"
+    value = "QUERY_BASE_PATH"
+  }
+
+  set {
+    name  = "allInOne.extraEnv[1].value"
+    value = "/jaeger"
+  }
+
+  depends_on = [kubernetes_namespace.monitoring]
+}
+
+
+# ──────────────────────────────────────────────
+# PROMETHEUS RULES — Alertes applicatives Black Friday
+# Ces règles surveillent les métriques critiques pendant
+# le test de charge et déclenchent des alertes via AlertManager.
+# ──────────────────────────────────────────────
+
+resource "kubernetes_manifest" "blackfriday_alerts" {
+  manifest = {
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "PrometheusRule"
+    metadata = {
+      name      = "blackfriday-alerts"
+      namespace = kubernetes_namespace.monitoring.metadata[0].name
+      labels = {
+        "app.kubernetes.io/part-of" = "kube-prometheus-stack"
+        release                     = "kube-prometheus-stack"
+      }
+    }
+    spec = {
+      groups = [
+        {
+          name = "blackfriday.rules"
+          rules = [
+            {
+              alert = "HighLatencyP95"
+              expr  = "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service)) > 2"
+              for   = "2m"
+              labels = {
+                severity = "critical"
+              }
+              annotations = {
+                summary     = "Latence P95 > 2s sur {{ $labels.service }}"
+                description = "Le service {{ $labels.service }} a une latence P95 de {{ $value }}s, au-dessus du seuil de 2s requis par le cahier des charges."
+              }
+            },
+            {
+              alert = "HighErrorRate"
+              expr  = "sum(rate(http_server_request_duration_seconds_count{http_status_code=~\"5..\"}[5m])) by (service) / sum(rate(http_server_request_duration_seconds_count[5m])) by (service) > 0.01"
+              for   = "2m"
+              labels = {
+                severity = "critical"
+              }
+              annotations = {
+                summary     = "Taux d'erreur > 1% sur {{ $labels.service }}"
+                description = "Le service {{ $labels.service }} a un taux d'erreur de {{ $value | humanizePercentage }}, au-dessus du seuil de 1% requis."
+              }
+            },
+            {
+              alert = "PodCrashLooping"
+              expr  = "increase(kube_pod_container_status_restarts_total[15m]) > 3"
+              for   = "5m"
+              labels = {
+                severity = "warning"
+              }
+              annotations = {
+                summary     = "Pod {{ $labels.pod }} en CrashLoop"
+                description = "Le pod {{ $labels.pod }} dans {{ $labels.namespace }} a redémarré {{ $value }} fois en 15 minutes."
+              }
+            },
+            {
+              alert = "HighMemoryUsage"
+              expr  = "container_memory_working_set_bytes / container_spec_memory_limit_bytes > 0.9"
+              for   = "5m"
+              labels = {
+                severity = "warning"
+              }
+              annotations = {
+                summary     = "Mémoire > 90% sur {{ $labels.pod }}"
+                description = "Le pod {{ $labels.pod }} utilise {{ $value | humanizePercentage }} de sa limite mémoire. Risque d'OOMKill."
+              }
+            },
+            {
+              alert = "HighCPUUsage"
+              expr  = "sum(rate(container_cpu_usage_seconds_total[5m])) by (pod, namespace) / sum(kube_pod_container_resource_limits{resource=\"cpu\"}) by (pod, namespace) > 0.9"
+              for   = "5m"
+              labels = {
+                severity = "warning"
+              }
+              annotations = {
+                summary     = "CPU > 90% sur {{ $labels.pod }}"
+                description = "Le pod {{ $labels.pod }} utilise {{ $value | humanizePercentage }} de sa limite CPU. L'HPA devrait scaler."
+              }
+            },
+            {
+              alert = "HPAMaxedOut"
+              expr  = "kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas"
+              for   = "10m"
+              labels = {
+                severity = "critical"
+              }
+              annotations = {
+                summary     = "HPA {{ $labels.horizontalpodautoscaler }} au maximum"
+                description = "L'HPA {{ $labels.horizontalpodautoscaler }} a atteint son nombre maximum de replicas depuis 10 minutes. Le service ne peut plus scaler."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+
+  depends_on = [helm_release.kube_prometheus_stack]
 }
