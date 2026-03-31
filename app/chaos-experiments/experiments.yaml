@@ -14,27 +14,6 @@ spec:
   duration: "30s"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
-kind: NetworkChaos
-metadata:
-  name: network-delay-200ms
-  namespace: chaos-mesh
-  annotations:
-    description: "Ajoute 200ms de latence réseau pour simuler une dégradation de performance inter-services"
-spec:
-  action: delay
-  mode: all
-  selector:
-    namespaces:
-      - default
-    labelSelectors:
-      app: frontend
-  delay:
-    latency: "200ms"
-    jitter: "50ms"
-    correlation: "50"
-  duration: "2m"
----
-apiVersion: chaos-mesh.org/v1alpha1
 kind: StressChaos
 metadata:
   name: cpu-stress-frontend
