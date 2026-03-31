@@ -2,6 +2,10 @@ include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
+locals {
+  secret_vars = read_terragrunt_config(find_in_parent_folders("secrets.hcl", "${get_terragrunt_dir()}/secrets.hcl"))
+}
+
 terraform {
   source = "../../../terraform/modules/alb"
 }
@@ -39,9 +43,6 @@ inputs = {
   cluster_endpoint                   = dependency.eks.outputs.cluster_endpoint
   cluster_certificate_authority_data = dependency.eks.outputs.cluster_certificate_authority_data
 
-  # IPs exemptes du rate-limiting WAF (load test k6, equipe)
-  # Ajouter les IPs au format CIDR. Ces IPs restent soumises aux regles de securite (XSS, SQLi...).
-  waf_whitelisted_ips = [
-    "92.184.117.228/32"  # equipe - IP actuelle
-  ]
+  # IPs exemptes du rate-limiting WAF — definies dans secrets.hcl
+  waf_whitelisted_ips = local.secret_vars.inputs.waf_whitelisted_ips
 }
