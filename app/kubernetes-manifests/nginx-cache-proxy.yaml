@@ -11,7 +11,7 @@ data:
 
     http {
       # Zone de cache partagée entre tous les workers Nginx (et donc tous les users)
-      # 10m = taille de la zone mémoire pour les métadonnées des clés
+      # 10m = taille d      kubectl describe svc nginx-cache-proxy      kubectl describe svc nginx-cache-proxye la zone mémoire pour les métadonnées des clés
       # max_size=512m = taille max du cache disque
       # inactive=60s = clé purgée si non accédée pendant 60s
       proxy_cache_path /tmp/nginx_cache
