@@ -29,7 +29,7 @@ spec:
         app: cartservice
     spec:
       serviceAccountName: cartservice
-      terminationGracePeriodSeconds: 5
+      terminationGracePeriodSeconds: 120
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -54,13 +54,17 @@ spec:
               value: "1"
             - name: REDIS_ADDR
               value: "redis-cart:6379"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 15"]
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
+              cpu: 250m
               memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
           readinessProbe:
             initialDelaySeconds: 15
             grpc:
@@ -123,6 +127,20 @@ spec:
           image: redis:alpine
           ports:
             - containerPort: 6379
+          command: ["redis-server"]
+          args:
+            - "--maxmemory"
+            - "450mb"
+            - "--maxmemory-policy"
+            - "allkeys-lru"
+            - "--tcp-backlog"
+            - "511"
+            - "--timeout"
+            - "0"
+            - "--tcp-keepalive"
+            - "300"
+            - "--maxclients"
+            - "10000"
           readinessProbe:
             periodSeconds: 5
             tcpSocket:
@@ -135,12 +153,12 @@ spec:
             - mountPath: /data
               name: redis-data
           resources:
-            limits:
-              memory: 256Mi
-              cpu: 125m
             requests:
-              cpu: 70m
-              memory: 200Mi
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
       volumes:
         - name: redis-data
           emptyDir: {}

@@ -19,6 +19,7 @@ metadata:
   labels:
     app: shippingservice
 spec:
+  replicas: 3
   selector:
     matchLabels:
       app: shippingservice
@@ -56,18 +57,22 @@ spec:
           value: "1"
         readinessProbe:
           periodSeconds: 5
+          timeoutSeconds: 5
           grpc:
             port: 50051
         livenessProbe:
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
           grpc:
             port: 50051
         resources:
           requests:
-            cpu: 100m
-            memory: 64Mi
-          limits:
             cpu: 200m
             memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
