@@ -203,6 +203,42 @@ aws dynamodb delete-table --table-name hetic-friday-g2-terraform-locks --region 
 
 ---
 
+### 📈 Mise en place des tests de charge
+
+**1. Environnement de Dev (Recommandé)**
+1. Installer les dépendences  k6 sur aws
+
+```bash
+helm repo add k6-operator https://grafana.github.io/helm-charts
+helm repo update
+helm install k6-operator k6-operator/k6-operator
+```
+
+**2. Appliquer le script de montée de charge sur EKS**
+Attention : Le test de montée de charge s'executera directement à la suite de ces commandes
+```bash
+kubectl create configmap k6-script --from-file=scripts/load_test.js
+kubectl apply -f .\app\kubernetes-manifests\load-test.yaml
+```
+
+**3. Monitorer la progression du test**
+K6 operator pour EKS n'expose pas en temps réel la barre de progression d'un test de charge en cours, nous avons besoin d'un port forwarding :
+```bash
+# Récupérer le nom de l'instance de test (ex: ecommerce-load-test-1-57r25)
+kubectl get pods 
+kubectl port-forward <INSTANCE-DE-TEST> 6565:6565
+curl http://localhost:6565/v1/status
+```
+
+**4. Mettre à jour le script de montée de charge**
+```bash
+kubectl delete -f .\app\kubernetes-manifests\load-test.yaml
+kubectl delete configmap k6-script
+```
+
+
+---
+
 ## 📚 Documentation
 
 - [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/)

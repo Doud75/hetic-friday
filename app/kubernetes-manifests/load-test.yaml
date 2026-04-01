@@ -1,0 +1,17 @@
+
+apiVersion: k6.io/v1alpha1
+kind: TestRun
+metadata:
+  name: ecommerce-load-test
+spec:
+  parallelism: 4
+  arguments: --compatibility-mode=base --verbose
+  script:
+    configMap:
+      name: k6-script
+      file: load_test.js
+  runner:
+    resources:
+      limits:
+        cpu: "4"
+        memory: "32Gi"
