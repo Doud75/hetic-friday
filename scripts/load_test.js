@@ -23,7 +23,7 @@ export const options = {
 
     // 5. Pic à 90k
     { duration: '5m', target: 90000 },
-    { duration: '5m', target: 90000 },
+    { duration: '10m', target: 90000 },
 
     // 6. Redescente
     { duration: '5m', target: 0 },
