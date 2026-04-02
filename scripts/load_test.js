@@ -30,11 +30,11 @@ export const options = {
   ],
   thresholds: {
     http_req_duration: ["p(95)<2000"], // 95% des requêtes < 2s
-    http_req_failed: ["rate<0.05"], // Moins de 5% d'erreurs
+    http_req_failed: ["rate<0.01"], // Moins de 1% d'erreurs
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || "http://a00d025d61513404d9e74bdb63ce78dc-b9804b293783b47b.elb.eu-central-2.amazonaws.com";
+const BASE_URL = __ENV.BASE_URL || "http://hetic-friday-prod-alb-170460687.eu-central-1.elb.amazonaws.com";
 
 const params = {
   headers: { "Connection": "keep-alive" },
