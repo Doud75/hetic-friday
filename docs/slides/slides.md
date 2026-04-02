@@ -40,6 +40,10 @@ drawings:
   </div>
 </div>
 
+<!--
+adrien s
+-->
+
 ---
 transition: fade
 ---
@@ -98,6 +102,10 @@ transition: slide-up
 # Architecture AWS
 <p class="text-gray-400">VPC 3 tiers · EKS Auto Mode · ALB · RDS Multi-AZ</p>
 
+<!--
+adam
+-->
+
 ---
 transition: fade
 class: "!p-2"
@@ -108,6 +116,10 @@ class: "!p-2"
   <p class="text-xs text-gray-500 mt-2">VPC 10.0.0.0/16 · 3 AZ eu-central-1 · EKS Auto Mode Kubernetes 1.34 · ALB · RDS Multi-AZ</p>
 </div>
 
+<!--
+adam
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -115,6 +127,10 @@ transition: slide-up
 
 # Infrastructure as Code
 <p class="text-gray-400">Terraform + Terragrunt · State S3 · DynamoDB locking</p>
+
+<!--
+adam
+-->
 
 ---
 layout: two-cols
@@ -182,6 +198,10 @@ cd live/prod && terragrunt run-all apply
 
 </div>
 
+<!--
+adam
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -189,6 +209,10 @@ transition: slide-up
 
 # Réseau & Sécurité
 <p class="text-gray-400">VPC Multi-AZ · WAF · IAM Least Privilege</p>
+
+<!--
+ayline
+-->
 
 ---
 zoom: 0.85
@@ -256,6 +280,10 @@ transition: fade
 
 </div>
 
+<!--
+ayline
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -263,6 +291,10 @@ transition: slide-up
 
 # EKS & Auto-Scaling
 <p class="text-gray-400">HPA · Spot Instances · Cluster Autoscaler</p>
+
+<!--
+adrien j
+-->
 
 ---
 layout: two-cols
@@ -310,6 +342,10 @@ spec:
 
 </div>
 
+<!--
+adrien j
+-->
+
 ---
 layout: two-cols
 zoom: 0.9
@@ -350,6 +386,10 @@ transition: fade
 
 </div>
 
+<!--
+adrien j
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -357,6 +397,10 @@ transition: slide-up
 
 # CI/CD
 <p class="text-gray-400">GitHub Actions · EKS</p>
+
+<!--
+adrien s
+-->
 
 ---
 zoom: 0.85
@@ -430,6 +474,10 @@ transition: slide-up
 # Observabilité
 <p class="text-gray-400">Prometheus · Grafana · Jaeger · Alerting</p>
 
+<!--
+adam
+-->
+
 ---
 layout: two-cols
 zoom: 0.88
@@ -498,6 +546,10 @@ rules:
 
 </div>
 
+<!--
+adam
+-->
+
 ---
 transition: fade
 class: "!p-2"
@@ -510,6 +562,10 @@ class: "!p-2"
   <p class="text-xs text-gray-500 mt-2">CPU moyen ~58% en pic · 90 → 500+ pods · autoscaling HPA actif</p>
 </div>
 
+<!--
+adam
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -517,6 +573,10 @@ transition: slide-up
 
 # Tests de Charge
 <p class="text-gray-400">K6 · 4 pods EKS · 90 000 utilisateurs simultanés</p>
+
+<!--
+adrien j
+-->
 
 ---
 layout: two-cols
@@ -558,6 +618,10 @@ transition: fade
 </v-click>
 
 </div>
+
+<!--
+adrien j
+-->
 
 ---
 zoom: 0.88
@@ -606,6 +670,10 @@ transition: fade
 </div>
 </div>
 
+<!--
+adrien j
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -613,6 +681,10 @@ transition: slide-up
 
 # Chaos Engineering
 <p class="text-gray-400">Chaos Mesh · Résilience testée avant le jour J</p>
+
+<!--
+ayline
+-->
 
 ---
 layout: two-cols
@@ -687,6 +759,10 @@ kubectl port-forward svc/chaos-dashboard \
 
 </div>
 
+<!--
+ayline
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -694,6 +770,10 @@ transition: slide-up
 
 # Post-Mortem
 <p class="text-gray-400">Ce qu'on a rencontré · Ce qu'on a appris</p>
+
+<!--
+adam
+-->
 
 ---
 zoom: 0.82
@@ -739,6 +819,10 @@ transition: fade
 
 </div>
 
+<!--
+adam
+-->
+
 ---
 layout: section
 transition: slide-up
@@ -746,6 +830,10 @@ transition: slide-up
 
 # FinOps
 <p class="text-gray-400">Optimisations · Budget réel · Spot Instances</p>
+
+<!--
+adrien s
+-->
 
 ---
 layout: two-cols
@@ -816,9 +904,17 @@ transition: zoom
 
 **0.03% d'erreurs · 768ms latence moyenne · 500+ pods**
 
+<!--
+adrien s
+-->
+
 ---
 layout: end
 transition: fade
 ---
 
 # Merci
+
+<!--
+adrien s
+-->
