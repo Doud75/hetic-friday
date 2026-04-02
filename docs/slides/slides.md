@@ -46,40 +46,49 @@ transition: fade
 
 # Stack technique
 
-<div class="grid grid-cols-4 gap-3 mt-4 text-center text-sm">
-  <div class="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3">
-    <div class="text-orange-400 font-bold mb-1">IaC</div>
-    <div class="text-gray-300 text-xs">Terraform · Terragrunt</div>
-  </div>
-  <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
-    <div class="text-blue-400 font-bold mb-1">Compute</div>
-    <div class="text-gray-300 text-xs">AWS EKS Auto Mode · Spot Instances</div>
-  </div>
-  <div class="bg-green-900/30 border border-green-500/30 rounded-lg p-3">
-    <div class="text-green-400 font-bold mb-1">Réseau</div>
-    <div class="text-gray-300 text-xs">ALB · WAF v2 · VPC 3 tiers</div>
-  </div>
-  <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
-    <div class="text-purple-400 font-bold mb-1">Data</div>
-    <div class="text-gray-300 text-xs">RDS PostgreSQL Multi-AZ · Redis</div>
-  </div>
-  <div class="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3">
-    <div class="text-yellow-400 font-bold mb-1">Observabilité</div>
-    <div class="text-gray-300 text-xs">Prometheus · Grafana · Jaeger</div>
-  </div>
-  <div class="bg-pink-900/30 border border-pink-500/30 rounded-lg p-3">
-    <div class="text-pink-400 font-bold mb-1">CI/CD</div>
-    <div class="text-gray-300 text-xs">GitHub Actions · Skaffold · ECR</div>
-  </div>
-  <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
-    <div class="text-red-400 font-bold mb-1">Résilience</div>
-    <div class="text-gray-300 text-xs">Chaos Mesh · HPA · Cluster Autoscaler</div>
-  </div>
-  <div class="bg-gray-700/50 border border-gray-500/30 rounded-lg p-3">
-    <div class="text-gray-300 font-bold mb-1">Tests de charge</div>
-    <div class="text-gray-300 text-xs">K6 · 4 pods EKS · 90K VUs</div>
-  </div>
+<div class="flex items-center justify-center h-[80%]">
+    <div class="grid grid-cols-4 gap-3 text-center text-sm w-full">
+      <div class="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3">
+        <div class="text-orange-400 font-bold mb-1">IaC</div>
+        <div class="text-gray-300 text-xs">Terraform · Terragrunt</div>
+      </div>
+      <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
+        <div class="text-blue-400 font-bold mb-1">Compute</div>
+        <div class="text-gray-300 text-xs">AWS EKS Auto Mode · Spot Instances</div>
+      </div>
+      <div class="bg-green-900/30 border border-green-500/30 rounded-lg p-3">
+        <div class="text-green-400 font-bold mb-1">Réseau</div>
+        <div class="text-gray-300 text-xs">ALB · WAF · VPC 3 tiers</div>
+      </div>
+      <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
+        <div class="text-purple-400 font-bold mb-1">Data</div>
+        <div class="text-gray-300 text-xs">RDS PostgreSQL Multi-AZ · Redis</div>
+      </div>
+      <div class="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3">
+        <div class="text-yellow-400 font-bold mb-1">Observabilité</div>
+        <div class="text-gray-300 text-xs">Prometheus · Grafana · Jaeger</div>
+      </div>
+      <div class="bg-pink-900/30 border border-pink-500/30 rounded-lg p-3">
+        <div class="text-pink-400 font-bold mb-1">CI/CD</div>
+        <div class="text-gray-300 text-xs">GitHub Actions · ECR</div>
+      </div>
+      <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+        <div class="text-red-400 font-bold mb-1">Résilience</div>
+        <div class="text-gray-300 text-xs">Chaos Mesh · HPA · EKS Auto mode</div>
+      </div>
+      <div class="bg-gray-700/50 border border-gray-500/30 rounded-lg p-3">
+        <div class="text-gray-300 font-bold mb-1">Tests de charge</div>
+        <div class="text-gray-300 text-xs">K6 · 4 pods EKS</div>
+      </div>
+    </div>
 </div>
+
+<!--
+- IaC : Terraform pour décrire l'infra, Terragrunt pour moins de config, et structure module pour meilleur gestion du tfstate.
+- Compute : EKS Auto Mode = AWS gère les nodes à notre place. Spot = 60-70% moins cher, AWS peut reprendre l'instance mais Kubernetes replace les pods automatiquement.
+- Réseau : tout le trafic entre par l'ALB, les nodes sont dans des subnets privés sans IP publique.
+- Data : RDS Multi-AZ = réplique synchrone, bascule auto en cas de panne. Redis pour les paniers.
+-->
 
 ---
 layout: section
@@ -188,14 +197,15 @@ transition: fade
 
 # Notre design réseau
 
-<div class="grid grid-cols-3 gap-3 mt-2 text-sm">
+<div class="flex flex-col justify-center h-[80%] gap-3">
+
+<div class="grid grid-cols-3 gap-3 text-sm">
 
 <div class="bg-red-900/25 border border-red-500/30 rounded-lg p-3">
   <div class="text-red-400 font-bold mb-2">🌐 Public — 10.0.0.0/20</div>
   <ul class="space-y-1 text-gray-300 text-xs">
     <li>ALB (entrée unique)</li>
     <li>NAT Gateways × 3</li>
-    <li>Bastion host</li>
   </ul>
   <div class="mt-2 text-xs text-gray-500"><code>kubernetes.io/role/elb=1</code></div>
 </div>
@@ -222,7 +232,7 @@ transition: fade
 
 </div>
 
-<div class="grid grid-cols-2 gap-3 mt-3">
+<div class="grid grid-cols-2 gap-3">
 
 <div v-click class="bg-gray-800/60 border border-gray-600 rounded-lg p-3 text-sm">
   <div class="text-yellow-400 font-bold mb-2">🔒 WAF & NACLs</div>
@@ -240,6 +250,8 @@ transition: fade
     <li>Secrets Manager pour credentials RDS</li>
     <li>Rotation automatique activée</li>
   </ul>
+</div>
+
 </div>
 
 </div>
@@ -344,7 +356,7 @@ transition: slide-up
 ---
 
 # CI/CD
-<p class="text-gray-400">GitHub Actions · Skaffold · Kind · EKS</p>
+<p class="text-gray-400">GitHub Actions · EKS</p>
 
 ---
 zoom: 0.85
@@ -353,15 +365,16 @@ transition: fade
 
 # Notre pipeline CI/CD
 
-<div class="grid grid-cols-3 gap-3 mt-2">
+<div class="flex flex-col justify-center h-[80%] gap-3">
+
+<div class="grid grid-cols-3 gap-3">
 
 <div v-click class="bg-gray-800/60 border border-gray-600 rounded-lg p-3 text-xs">
   <div class="text-blue-400 font-bold mb-2 text-sm">PR → main</div>
   <ol class="space-y-1 text-gray-300 list-decimal list-inside">
     <li>Tests unitaires (Go, C#)</li>
-    <li>Build images (Skaffold)</li>
-    <li>Deploy sur <code>kind</code> cluster</li>
-    <li>Smoke tests namespace <code>pr&lt;N&gt;</code></li>
+    <li>Build images</li>
+    <li>Smoke tests</li>
     <li>Scan Trivy (images)</li>
   </ol>
 </div>
@@ -371,7 +384,6 @@ transition: fade
   <ol class="space-y-1 text-gray-300 list-decimal list-inside">
     <li>Mêmes checks PR</li>
     <li>Push images vers ECR</li>
-    <li>Attente 50+ requêtes loadgen</li>
     <li>Validation smoke tests</li>
   </ol>
 </div>
@@ -400,6 +412,15 @@ transition: fade
 ```
 
 </v-click>
+
+</div>
+
+<!--
+- PR : tests + build + smoke tests sur un cluster local (kind), rien ne touche AWS.
+- Push main : idem + push des images vers ECR (le registre Docker d'AWS).
+- CD : déclenché manuellement, c'est volontaire — on veut une validation humaine avant de toucher la prod.
+Le code yaml montré c'est la vraie commande qui tourne : update kubeconfig pour parler au cluster EKS, apply des manifests, vérification que le déploiement s'est bien passé.
+-->
 
 ---
 layout: section
@@ -545,6 +566,7 @@ transition: fade
 
 # Résultats du test de charge
 
+<div class="flex flex-col justify-center h-[80%] gap-3">
 <div class="grid grid-cols-3 gap-4 mt-4">
 
 <div class="bg-green-900/30 border border-green-500/40 rounded-lg p-4 text-center">
@@ -581,6 +603,7 @@ transition: fade
   <p class="text-gray-300 text-xs mt-1">Levier majeur de réduction de latence sous charge</p>
 </div>
 
+</div>
 </div>
 
 ---
@@ -775,6 +798,14 @@ transition: fade
 </v-click>
 
 </div>
+
+<!--
+- Spot Instances : le levier principal, 60-70% d'économies sur les nodes applicatifs. Acceptable car Kubernetes replace les pods si AWS reprend une instance.
+- 1 NAT GW en dev vs 3 en prod : en dev on accepte qu'une panne d'AZ coupe l'accès Internet, en prod non.
+- VPC Endpoints : le trafic vers S3 et ECR reste sur le réseau AWS, ne passe pas par le NAT GW → gratuit.
+- Budget : fourchettes cibles, pas de chiffres réels mesurés. Les alertes AWS Budgets nous préviennent à 50/80/100%.
+- Les 4 alertes : 50% = informatif, 80% = il reste de la marge pour réagir, 100% = dépassé, 100% forecast = AWS prédit le dépassement avant qu'il arrive (le plus utile).
+-->
 
 ---
 layout: fact
