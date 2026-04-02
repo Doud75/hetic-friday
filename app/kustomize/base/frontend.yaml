@@ -31,6 +31,7 @@ spec:
         sidecar.istio.io/rewriteAppHTTPProbers: "true"
     spec:
       serviceAccountName: frontend
+      terminationGracePeriodSeconds: 90
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -38,6 +39,10 @@ spec:
         runAsUser: 1000
       containers:
         - name: server
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -65,6 +70,10 @@ spec:
                 - name: "Cookie"
                   value: "shop_session-id=x-liveness-probe"
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
             - name: PORT
               value: "8080"
             - name: PRODUCT_CATALOG_SERVICE_ADDR
@@ -100,11 +109,11 @@ spec:
           #   value: "" # This value would look like "http://123.123.123"
           resources:
             requests:
-              cpu: 100m
-              memory: 64Mi
+              cpu: 200m
+              memory: 128Mi
             limits:
-              cpu: 500m
-              memory: 256Mi
+              cpu: "1"
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

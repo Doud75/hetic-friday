@@ -19,6 +19,7 @@ metadata:
   labels:
     app: shippingservice
 spec:
+  replicas: 3
   selector:
     matchLabels:
       app: shippingservice
@@ -46,24 +47,32 @@ spec:
         ports:
         - containerPort: 50051
         env:
+        - name: COLLECTOR_SERVICE_ADDR
+          value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
+          value: "1"
         - name: PORT
           value: "50051"
         - name: DISABLE_PROFILER
           value: "1"
         readinessProbe:
           periodSeconds: 5
+          timeoutSeconds: 5
           grpc:
             port: 50051
         livenessProbe:
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
           grpc:
             port: 50051
         resources:
           requests:
-            cpu: 100m
-            memory: 64Mi
-          limits:
             cpu: 200m
             memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
 ---
 apiVersion: v1
 kind: Service

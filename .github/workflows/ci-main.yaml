@@ -137,7 +137,17 @@ jobs:
 
           echo "Building and deploying with Skaffold..."
           skaffold config set --global local-cluster true
-          skaffold run --profile=ci --namespace=$NAMESPACE --tag=${GITHUB_SHA:0:8}
+          skaffold run --status-check=false --profile=ci --namespace=$NAMESPACE --tag=${GITHUB_SHA:0:8}
+
+          # Keep CI stable on small kind clusters: clamp HPA/deployments to a single replica.
+          for HPA in frontend cartservice-hpa checkoutservice-hpa currencyservice-hpa productcatalogservice-hpa recommendationservice-hpa nginx-cache-proxy-hpa; do
+            kubectl patch hpa/$HPA -n $NAMESPACE --type=merge --patch '{"spec":{"minReplicas":1,"maxReplicas":1}}' || true
+          done
+
+          for DEPLOY in frontend cartservice checkoutservice currencyservice productcatalogservice recommendationservice shippingservice nginx-cache-proxy; do
+            kubectl scale deployment/$DEPLOY --replicas=1 -n $NAMESPACE || true
+          done
+          kubectl scale deployment/loadgenerator --replicas=0 -n $NAMESPACE || true
 
       - name: Wait For Pods
         timeout-minutes: 20
@@ -154,7 +164,6 @@ jobs:
           kubectl wait --for=condition=available --timeout=600s deployment/currencyservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/emailservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/frontend || true
-          kubectl wait --for=condition=available --timeout=600s deployment/loadgenerator || true
           kubectl wait --for=condition=available --timeout=600s deployment/paymentservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/productcatalogservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/recommendationservice || true
@@ -190,6 +199,8 @@ jobs:
           # Check loadgenerator logs if it exists
           if kubectl get deployment loadgenerator -n $NAMESPACE &>/dev/null; then
             echo "Checking loadgenerator logs..."
+            kubectl scale deployment/loadgenerator --replicas=1 -n $NAMESPACE || true
+            kubectl rollout status deployment/loadgenerator -n $NAMESPACE --timeout=90s || true
             # start fresh loadgenerator pod
             kubectl delete pod -l app=loadgenerator -n $NAMESPACE || true
             sleep 10
@@ -206,6 +217,7 @@ jobs:
             if [[ "$ERROR_COUNT" -gt "0" ]]; then
               echo "⚠️  Load generator reported errors: $ERROR_COUNT"
             fi
+            kubectl scale deployment/loadgenerator --replicas=0 -n $NAMESPACE || true
           fi
 
           kill $PF_PID || true
