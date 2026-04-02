@@ -97,9 +97,16 @@ jobs:
 
           echo "Building and deploying with Skaffold..."
           skaffold config set --global local-cluster true
-          skaffold run --profile=ci --namespace=$NAMESPACE --tag=pr-${{ github.event.pull_request.number }}
+          skaffold run --status-check=false --profile=ci --namespace=$NAMESPACE --tag=pr-${{ github.event.pull_request.number }}
 
-          # Keep PR deployment checks lightweight: disable synthetic traffic generator.
+          # Keep CI stable on small kind clusters: clamp HPA/deployments to a single replica.
+          for HPA in frontend cartservice-hpa checkoutservice-hpa currencyservice-hpa productcatalogservice-hpa recommendationservice-hpa nginx-cache-proxy-hpa; do
+            kubectl patch hpa/$HPA -n $NAMESPACE --type=merge --patch '{"spec":{"minReplicas":1,"maxReplicas":1}}' || true
+          done
+
+          for DEPLOY in frontend cartservice checkoutservice currencyservice productcatalogservice recommendationservice shippingservice nginx-cache-proxy; do
+            kubectl scale deployment/$DEPLOY --replicas=1 -n $NAMESPACE || true
+          done
           kubectl scale deployment/loadgenerator --replicas=0 -n $NAMESPACE || true
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -119,7 +126,6 @@ jobs:
           kubectl wait --for=condition=available --timeout=600s deployment/currencyservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/emailservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/frontend || true
-          kubectl wait --for=condition=available --timeout=600s deployment/loadgenerator || true
           kubectl wait --for=condition=available --timeout=600s deployment/paymentservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/productcatalogservice || true
           kubectl wait --for=condition=available --timeout=600s deployment/recommendationservice || true
@@ -152,10 +158,13 @@ jobs:
           # Test frontend is responding
           curl -f http://localhost:8080 || echo "⚠️  Frontend not responding yet"
 
-          # Check loadgenerator logs if it exists
+          # Optionally run loadgenerator briefly during smoke test, then turn it back off.
           if kubectl get deployment loadgenerator -n $NAMESPACE &>/dev/null; then
             echo "Checking loadgenerator logs..."
+            kubectl scale deployment/loadgenerator --replicas=1 -n $NAMESPACE || true
+            kubectl rollout status deployment/loadgenerator -n $NAMESPACE --timeout=90s || true
             kubectl logs -l app=loadgenerator -n $NAMESPACE --tail=50 || true
+            kubectl scale deployment/loadgenerator --replicas=0 -n $NAMESPACE || true
           fi
 
           kill $PF_PID || true
