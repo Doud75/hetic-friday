@@ -98,6 +98,9 @@ jobs:
           echo "Building and deploying with Skaffold..."
           skaffold config set --global local-cluster true
           skaffold run --profile=ci --namespace=$NAMESPACE --tag=pr-${{ github.event.pull_request.number }}
+
+          # Keep PR deployment checks lightweight: disable synthetic traffic generator.
+          kubectl scale deployment/loadgenerator --replicas=0 -n $NAMESPACE || true
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
