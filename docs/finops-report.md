@@ -80,9 +80,9 @@ Les seuils de scaling par service ont été calibrés en fonction de leur critic
 
 La politique de scale-up est volontairement agressive (doublement toutes les 15 secondes) pour absorber les montées en charge brusques typiques d'un Black Friday. La politique de scale-down est plus conservatrice (fenêtre de stabilisation de 5 minutes) pour éviter de détruire des pods encore utiles lors de brèves accalmies.
 
-### Cluster Autoscaler
+### EKS Auto Mode et scaling des nœuds
 
-Au niveau des nœuds EC2, le Cluster Autoscaler surveille les pods en état `Pending` (ceux qui ne trouvent pas de nœud avec suffisamment de ressources) et provisionne automatiquement de nouveaux nœuds Spot. Inversement, il déprovisionne les nœuds sous-utilisés en dehors des pics de charge. Cette mécanique garantit que le cluster ne tourne pas avec des nœuds idle coûteux pendant les phases de faible activité.
+Au niveau des nœuds EC2, le scaling est géré nativement par **EKS Auto Mode**, sans Cluster Autoscaler à déployer séparément. EKS Auto Mode surveille les pods en état `Pending` et provisionne automatiquement de nouveaux nœuds Spot lorsque les ressources disponibles sont insuffisantes. Inversement, il déprovisionne les nœuds sous-utilisés en dehors des pics de charge. Cette mécanique garantit que le cluster ne tourne pas avec des nœuds idle coûteux pendant les phases de faible activité.
 
 ---
 
