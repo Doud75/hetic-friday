@@ -53,6 +53,10 @@ spec:
             grpc:
               port: 5050
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
             - name: PORT
               value: "5050"
             - name: PRODUCT_CATALOG_SERVICE_ADDR

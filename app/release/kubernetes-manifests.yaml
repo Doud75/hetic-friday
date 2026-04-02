@@ -21,19 +21,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: emailservice
+  name: adservice
   labels:
-    app: emailservice
+    app: adservice
 spec:
   selector:
     matchLabels:
-      app: emailservice
+      app: adservice
   template:
     metadata:
       labels:
-        app: emailservice
+        app: adservice
     spec:
-      serviceAccountName: emailservice
+      serviceAccountName: adservice
       terminationGracePeriodSeconds: 5
       securityContext:
         fsGroup: 1000
@@ -49,67 +49,115 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice:v0.10.4
+        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice:v0.10.4
         ports:
-        - containerPort: 8080
+        - containerPort: 9555
         env:
-        - name: PORT
-          value: "8080"
-        - name: DISABLE_PROFILER
+        - name: COLLECTOR_SERVICE_ADDR
+          value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
           value: "1"
-        readinessProbe:
-          periodSeconds: 5
-          grpc:
-            port: 8080
-        livenessProbe:
-          periodSeconds: 5
-          grpc:
-            port: 8080
+        - name: PORT
+          value: "9555"
         resources:
           requests:
-            cpu: 100m
-            memory: 64Mi
-          limits:
             cpu: 200m
-            memory: 128Mi
+            memory: 180Mi
+          limits:
+            cpu: 300m
+            memory: 300Mi
+        readinessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          grpc:
+            port: 9555
+        livenessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          grpc:
+            port: 9555
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: emailservice
+  name: adservice
   labels:
-    app: emailservice
+    app: adservice
 spec:
   type: ClusterIP
   selector:
-    app: emailservice
+    app: adservice
   ports:
   - name: grpc
-    port: 5000
-    targetPort: 8080
+    port: 9555
+    targetPort: 9555
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: emailservice
+  name: adservice
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cartservice-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cartservice
+  minReplicas: 10
+  maxReplicas: 150
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 15
+        - type: Pods
+          value: 10
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 120
+      selectPolicy: Min
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: checkoutservice
+  name: cartservice
   labels:
-    app: checkoutservice
+    app: cartservice
 spec:
-  replicas: 3
+  replicas: 5
   selector:
     matchLabels:
-      app: checkoutservice
+      app: cartservice
   template:
     metadata:
       labels:
-        app: checkoutservice
+        app: cartservice
     spec:
-      serviceAccountName: checkoutservice
+      serviceAccountName: cartservice
+      terminationGracePeriodSeconds: 120
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -124,57 +172,139 @@ spec:
                 - ALL
             privileged: false
             readOnlyRootFilesystem: true
-          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/checkoutservice:v0.10.4
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice:v0.10.4
           ports:
-            - containerPort: 5050
-          readinessProbe:
-            grpc:
-              port: 5050
-          livenessProbe:
-            grpc:
-              port: 5050
+            - containerPort: 7070
           env:
-            - name: PORT
-              value: "5050"
-            - name: PRODUCT_CATALOG_SERVICE_ADDR
-              value: "productcatalogservice:3550"
-            - name: SHIPPING_SERVICE_ADDR
-              value: "shippingservice:50051"
-            - name: PAYMENT_SERVICE_ADDR
-              value: "paymentservice:50051"
-            - name: EMAIL_SERVICE_ADDR
-              value: "emailservice:5000"
-            - name: CURRENCY_SERVICE_ADDR
-              value: "currencyservice:7000"
-            - name: CART_SERVICE_ADDR
-              value: "cartservice:7070"
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
+            - name: REDIS_ADDR
+              value: "redis-cart:6379"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 15"]
           resources:
             requests:
-              cpu: 200m
-              memory: 128Mi
-            limits:
-              cpu: 400m
+              cpu: 250m
               memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            initialDelaySeconds: 15
+            grpc:
+              port: 7070
+          livenessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            grpc:
+              port: 7070
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: checkoutservice
+  name: cartservice
   labels:
-    app: checkoutservice
+    app: cartservice
 spec:
   type: ClusterIP
   selector:
-    app: checkoutservice
+    app: cartservice
   ports:
     - name: grpc
-      port: 5050
-      targetPort: 5050
+      port: 7070
+      targetPort: 7070
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: checkoutservice
+  name: cartservice
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cart
+  labels:
+    app: redis-cart
+spec:
+  selector:
+    matchLabels:
+      app: redis-cart
+  template:
+    metadata:
+      labels:
+        app: redis-cart
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: redis
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          image: redis:alpine
+          ports:
+            - containerPort: 6379
+          command: ["redis-server"]
+          args:
+            - "--maxmemory"
+            - "450mb"
+            - "--maxmemory-policy"
+            - "allkeys-lru"
+            - "--tcp-backlog"
+            - "511"
+            - "--timeout"
+            - "0"
+            - "--tcp-keepalive"
+            - "300"
+            - "--maxclients"
+            - "10000"
+          readinessProbe:
+            periodSeconds: 5
+            tcpSocket:
+              port: 6379
+          livenessProbe:
+            periodSeconds: 5
+            tcpSocket:
+              port: 6379
+          volumeMounts:
+            - mountPath: /data
+              name: redis-data
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cart
+  labels:
+    app: redis-cart
+spec:
+  type: ClusterIP
+  selector:
+    app: redis-cart
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: 6379
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -222,21 +352,20 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: recommendationservice
+  name: checkoutservice
   labels:
-    app: recommendationservice
+    app: checkoutservice
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: recommendationservice
+      app: checkoutservice
   template:
     metadata:
       labels:
-        app: recommendationservice
+        app: checkoutservice
     spec:
-      serviceAccountName: recommendationservice
-      terminationGracePeriodSeconds: 5
+      serviceAccountName: checkoutservice
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -251,113 +380,80 @@ spec:
                 - ALL
             privileged: false
             readOnlyRootFilesystem: true
-          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice:v0.10.4
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/checkoutservice:v0.10.4
           ports:
-            - containerPort: 8080
+            - containerPort: 5050
           readinessProbe:
-            periodSeconds: 5
             grpc:
-              port: 8080
+              port: 5050
           livenessProbe:
-            periodSeconds: 5
             grpc:
-              port: 8080
+              port: 5050
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
             - name: PORT
-              value: "8080"
+              value: "5050"
             - name: PRODUCT_CATALOG_SERVICE_ADDR
               value: "productcatalogservice:3550"
-            - name: DISABLE_PROFILER
-              value: "1"
+            - name: SHIPPING_SERVICE_ADDR
+              value: "shippingservice:50051"
+            - name: PAYMENT_SERVICE_ADDR
+              value: "paymentservice:50051"
+            - name: EMAIL_SERVICE_ADDR
+              value: "emailservice:5000"
+            - name: CURRENCY_SERVICE_ADDR
+              value: "currencyservice:7000"
+            - name: CART_SERVICE_ADDR
+              value: "cartservice:7070"
           resources:
             requests:
               cpu: 200m
-              memory: 256Mi
+              memory: 128Mi
             limits:
               cpu: 400m
-              memory: 512Mi
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: recommendationservice
+  name: checkoutservice
   labels:
-    app: recommendationservice
+    app: checkoutservice
 spec:
   type: ClusterIP
   selector:
-    app: recommendationservice
+    app: checkoutservice
   ports:
     - name: grpc
-      port: 8080
-      targetPort: 8080
+      port: 5050
+      targetPort: 5050
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: recommendationservice
+  name: checkoutservice
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: productcatalogservice-hpa
+  name: currencyservice-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: productcatalogservice
+    name: currencyservice
   minReplicas: 5
-  maxReplicas: 80
+  maxReplicas: 50
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 30
-      policies:
-        - type: Percent
-          value: 200
-          periodSeconds: 15
-        - type: Pods
-          value: 10
-          periodSeconds: 15
-      selectPolicy: Max
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 50
-          periodSeconds: 60
-      selectPolicy: Max
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: recommendationservice-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: recommendationservice
-  minReplicas: 3
-  maxReplicas: 60
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
+          averageUtilization: 50
     - type: Resource
       resource:
         name: memory
@@ -386,6 +482,203 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: currencyservice
+  labels:
+    app: currencyservice
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: currencyservice
+  template:
+    metadata:
+      labels:
+        app: currencyservice
+    spec:
+      serviceAccountName: currencyservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice:v0.10.4
+          ports:
+            - name: grpc
+              containerPort: 7000
+          env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
+            - name: PORT
+              value: "7000"
+            - name: DISABLE_PROFILER
+              value: "1"
+          readinessProbe:
+            grpc:
+              port: 7000
+          livenessProbe:
+            grpc:
+              port: 7000
+          resources:
+            requests:
+              cpu: 500m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: currencyservice
+  labels:
+    app: currencyservice
+spec:
+  type: ClusterIP
+  selector:
+    app: currencyservice
+  ports:
+    - name: grpc
+      port: 7000
+      targetPort: 7000
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: currencyservice
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emailservice
+  labels:
+    app: emailservice
+spec:
+  selector:
+    matchLabels:
+      app: emailservice
+  template:
+    metadata:
+      labels:
+        app: emailservice
+    spec:
+      serviceAccountName: emailservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice:v0.10.4
+        ports:
+        - containerPort: 8080
+        env:
+        - name: COLLECTOR_SERVICE_ADDR
+          value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
+          value: "1"
+        - name: PORT
+          value: "8080"
+        - name: DISABLE_PROFILER
+          value: "1"
+        readinessProbe:
+          periodSeconds: 5
+          grpc:
+            port: 8080
+        livenessProbe:
+          periodSeconds: 5
+          grpc:
+            port: 8080
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emailservice
+  labels:
+    app: emailservice
+spec:
+  type: ClusterIP
+  selector:
+    app: emailservice
+  ports:
+  - name: grpc
+    port: 5000
+    targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: emailservice
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend
+  minReplicas: 20
+  maxReplicas: 200
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Percent
+          value: 5
+          periodSeconds: 120
+      selectPolicy: Min
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: frontend
   labels:
     app: frontend
@@ -402,6 +695,7 @@ spec:
         sidecar.istio.io/rewriteAppHTTPProbers: "true"
     spec:
       serviceAccountName: frontend
+      terminationGracePeriodSeconds: 90
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -409,6 +703,10 @@ spec:
         runAsUser: 1000
       containers:
         - name: server
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -436,6 +734,10 @@ spec:
                 - name: "Cookie"
                   value: "shop_session-id=x-liveness-probe"
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
             - name: PORT
               value: "8080"
             - name: PRODUCT_CATALOG_SERVICE_ADDR
@@ -471,11 +773,11 @@ spec:
           #   value: "" # This value would look like "http://123.123.123"
           resources:
             requests:
-              cpu: 100m
-              memory: 64Mi
+              cpu: 200m
+              memory: 128Mi
             limits:
-              cpu: 500m
-              memory: 256Mi
+              cpu: "1"
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -501,27 +803,49 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: paymentservice
+  name: loadgenerator
   labels:
-    app: paymentservice
+    app: loadgenerator
 spec:
   selector:
     matchLabels:
-      app: paymentservice
+      app: loadgenerator
+  replicas: 1
   template:
     metadata:
       labels:
-        app: paymentservice
+        app: loadgenerator
+      annotations:
+        sidecar.istio.io/rewriteAppHTTPProbers: "true"
     spec:
-      serviceAccountName: paymentservice
+      serviceAccountName: loadgenerator
       terminationGracePeriodSeconds: 5
+      restartPolicy: Always
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
         runAsNonRoot: true
         runAsUser: 1000
-      containers:
-      - name: server
+      initContainers:
+      - command:
+        - /bin/sh
+        - -exc
+        - |
+          MAX_RETRIES=30
+          RETRY_INTERVAL=10
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i: Pinging frontend: ${FRONTEND_ADDR}..."
+            STATUSCODE=$(wget --server-response http://${FRONTEND_ADDR} 2>&1 | awk '/^  HTTP/{print $2}')
+            if [ $STATUSCODE -eq 200 ]; then
+                echo "Frontend is reachable."
+                exit 0
+            fi
+            echo "Error: Could not reach frontend - Status code: ${STATUSCODE}"
+            sleep $RETRY_INTERVAL
+          done
+          echo "Failed to reach frontend after $MAX_RETRIES attempts."
+          exit 1
+        name: frontend-check
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -529,90 +853,39 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice:v0.10.4
-        ports:
-        - containerPort: 50051
+        image: busybox:latest
         env:
-        - name: PORT
-          value: "50051"
-        - name: DISABLE_PROFILER
-          value: "1"
-        readinessProbe:
-          grpc:
-            port: 50051
-        livenessProbe:
-          grpc:
-            port: 50051
+        - name: FRONTEND_ADDR
+          value: "frontend:80"
+      containers:
+      - name: main
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/loadgenerator:v0.10.4
+        env:
+        - name: FRONTEND_ADDR
+          value: "frontend:80"
+        - name: USERS
+          value: "10"
+        - name: RATE
+          value: "5"
         resources:
           requests:
-            cpu: 100m
-            memory: 64Mi
+            cpu: 300m
+            memory: 256Mi
           limits:
-            cpu: 200m
-            memory: 128Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: paymentservice
-  labels:
-    app: paymentservice
-spec:
-  type: ClusterIP
-  selector:
-    app: paymentservice
-  ports:
-  - name: grpc
-    port: 50051
-    targetPort: 50051
+            cpu: 500m
+            memory: 512Mi
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: paymentservice
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: cartservice-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: cartservice
-  minReplicas: 5
-  maxReplicas: 100
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 30
-      policies:
-        - type: Percent
-          value: 200
-          periodSeconds: 15
-        - type: Pods
-          value: 10
-          periodSeconds: 15
-      selectPolicy: Max
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 50
-          periodSeconds: 60
-      selectPolicy: Max
+  name: loadgenerator
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -783,15 +1056,18 @@ spec:
           emptyDir:
             sizeLimit: 512Mi
 ---
-# Service internal : exposed via ALB (Terraform) + TargetGroupBinding
+# Service public : remplace frontend-external
 apiVersion: v1
 kind: Service
 metadata:
   name: nginx-cache-proxy
   labels:
     app: nginx-cache-proxy
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: nginx-cache-proxy
   ports:
@@ -823,6 +1099,144 @@ spec:
         target:
           type: Utilization
           averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 15
+        - type: Pods
+          value: 10
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 120
+      selectPolicy: Min
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paymentservice
+  labels:
+    app: paymentservice
+spec:
+  selector:
+    matchLabels:
+      app: paymentservice
+  template:
+    metadata:
+      labels:
+        app: paymentservice
+    spec:
+      serviceAccountName: paymentservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice:v0.10.4
+        ports:
+        - containerPort: 50051
+        env:
+        - name: COLLECTOR_SERVICE_ADDR
+          value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
+          value: "1"
+        - name: PORT
+          value: "50051"
+        - name: DISABLE_PROFILER
+          value: "1"
+        readinessProbe:
+          grpc:
+            port: 50051
+        livenessProbe:
+          grpc:
+            port: 50051
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paymentservice
+  labels:
+    app: paymentservice
+spec:
+  type: ClusterIP
+  selector:
+    app: paymentservice
+  ports:
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: paymentservice
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: productcatalogservice-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: productcatalogservice
+  minReplicas: 5
+  maxReplicas: 80
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 15
+        - type: Pods
+          value: 10
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+      selectPolicy: Max
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -864,6 +1278,14 @@ spec:
               value: "3550"
             - name: DISABLE_PROFILER
               value: "1"
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
+          envFrom:
+            - secretRef:
+                name: rds-credentials
+                optional: true
           readinessProbe:
             grpc:
               port: 3550
@@ -898,368 +1320,24 @@ kind: ServiceAccount
 metadata:
   name: productcatalogservice
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cartservice
-  labels:
-    app: cartservice
-spec:
-  replicas: 5
-  selector:
-    matchLabels:
-      app: cartservice
-  template:
-    metadata:
-      labels:
-        app: cartservice
-    spec:
-      serviceAccountName: cartservice
-      terminationGracePeriodSeconds: 5
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
-      containers:
-        - name: server
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice:v0.10.4
-          ports:
-            - containerPort: 7070
-          env:
-            - name: REDIS_ADDR
-              value: "redis-cart:6379"
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 256Mi
-          readinessProbe:
-            initialDelaySeconds: 15
-            grpc:
-              port: 7070
-          livenessProbe:
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            grpc:
-              port: 7070
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: cartservice
-  labels:
-    app: cartservice
-spec:
-  type: ClusterIP
-  selector:
-    app: cartservice
-  ports:
-    - name: grpc
-      port: 7070
-      targetPort: 7070
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: cartservice
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: redis-cart
-  labels:
-    app: redis-cart
-spec:
-  selector:
-    matchLabels:
-      app: redis-cart
-  template:
-    metadata:
-      labels:
-        app: redis-cart
-    spec:
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
-      containers:
-        - name: redis
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-          image: redis:alpine
-          ports:
-            - containerPort: 6379
-          readinessProbe:
-            periodSeconds: 5
-            tcpSocket:
-              port: 6379
-          livenessProbe:
-            periodSeconds: 5
-            tcpSocket:
-              port: 6379
-          volumeMounts:
-            - mountPath: /data
-              name: redis-data
-          resources:
-            limits:
-              memory: 256Mi
-              cpu: 125m
-            requests:
-              cpu: 70m
-              memory: 200Mi
-      volumes:
-        - name: redis-data
-          emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis-cart
-  labels:
-    app: redis-cart
-spec:
-  type: ClusterIP
-  selector:
-    app: redis-cart
-  ports:
-    - name: tcp-redis
-      port: 6379
-      targetPort: 6379
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: loadgenerator
-  labels:
-    app: loadgenerator
-spec:
-  selector:
-    matchLabels:
-      app: loadgenerator
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: loadgenerator
-      annotations:
-        sidecar.istio.io/rewriteAppHTTPProbers: "true"
-    spec:
-      serviceAccountName: loadgenerator
-      terminationGracePeriodSeconds: 5
-      restartPolicy: Always
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
-      initContainers:
-      - command:
-        - /bin/sh
-        - -exc
-        - |
-          MAX_RETRIES=30
-          RETRY_INTERVAL=10
-          for i in $(seq 1 $MAX_RETRIES); do
-            echo "Attempt $i: Pinging frontend: ${FRONTEND_ADDR}..."
-            STATUSCODE=$(wget --server-response http://${FRONTEND_ADDR} 2>&1 | awk '/^  HTTP/{print $2}')
-            if [ $STATUSCODE -eq 200 ]; then
-                echo "Frontend is reachable."
-                exit 0
-            fi
-            echo "Error: Could not reach frontend - Status code: ${STATUSCODE}"
-            sleep $RETRY_INTERVAL
-          done
-          echo "Failed to reach frontend after $MAX_RETRIES attempts."
-          exit 1
-        name: frontend-check
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
-        image: busybox:latest
-        env:
-        - name: FRONTEND_ADDR
-          value: "frontend:80"
-      containers:
-      - name: main
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
-        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/loadgenerator:v0.10.4
-        env:
-        - name: FRONTEND_ADDR
-          value: "frontend:80"
-        - name: USERS
-          value: "10"
-        - name: RATE
-          value: "5"
-        resources:
-          requests:
-            cpu: 300m
-            memory: 256Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: loadgenerator
----
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: frontend
+  name: recommendationservice-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: frontend
-  minReplicas: 20
-  maxReplicas: 200
+    name: recommendationservice
+  minReplicas: 5
+  maxReplicas: 60
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 30
-      policies:
-        - type: Percent
-          value: 200
-          periodSeconds: 15
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Pods
-          value: 2
-          periodSeconds: 60
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: currencyservice
-  labels:
-    app: currencyservice
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: currencyservice
-  template:
-    metadata:
-      labels:
-        app: currencyservice
-    spec:
-      serviceAccountName: currencyservice
-      terminationGracePeriodSeconds: 5
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
-      containers:
-        - name: server
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice:v0.10.4
-          ports:
-            - name: grpc
-              containerPort: 7000
-          env:
-            - name: PORT
-              value: "7000"
-            - name: DISABLE_PROFILER
-              value: "1"
-          readinessProbe:
-            grpc:
-              port: 7000
-          livenessProbe:
-            grpc:
-              port: 7000
-          resources:
-            requests:
-              cpu: 300m
-              memory: 128Mi
-            limits:
-              cpu: 600m
-              memory: 256Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: currencyservice
-  labels:
-    app: currencyservice
-spec:
-  type: ClusterIP
-  selector:
-    app: currencyservice
-  ports:
-    - name: grpc
-      port: 7000
-      targetPort: 7000
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: currencyservice
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: currencyservice-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: currencyservice
-  minReplicas: 3
-  maxReplicas: 50
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
+          averageUtilization: 50
     - type: Resource
       resource:
         name: memory
@@ -1288,10 +1366,170 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: recommendationservice
+  labels:
+    app: recommendationservice
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: recommendationservice
+  template:
+    metadata:
+      labels:
+        app: recommendationservice
+    spec:
+      serviceAccountName: recommendationservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice:v0.10.4
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            periodSeconds: 5
+            timeoutSeconds: 5
+            grpc:
+              port: 8080
+          livenessProbe:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+            grpc:
+              port: 8080
+          env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
+            - name: PORT
+              value: "8080"
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: "productcatalogservice:3550"
+            - name: DISABLE_PROFILER
+              value: "1"
+          resources:
+            requests:
+              cpu: 400m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommendationservice
+  labels:
+    app: recommendationservice
+spec:
+  type: ClusterIP
+  selector:
+    app: recommendationservice
+  ports:
+    - name: grpc
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: recommendationservice
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seed-products-sql
+data:
+  seed.sql: |
+    CREATE TABLE IF NOT EXISTS products (
+      id                      VARCHAR(20)  PRIMARY KEY,
+      name                    VARCHAR(255) NOT NULL,
+      description             TEXT         NOT NULL,
+      picture                 VARCHAR(255) NOT NULL,
+      price_usd_currency_code VARCHAR(3)   NOT NULL,
+      price_usd_units         BIGINT       NOT NULL,
+      price_usd_nanos         INT          NOT NULL,
+      categories              TEXT         NOT NULL
+    );
+
+    INSERT INTO products (id, name, description, picture, price_usd_currency_code, price_usd_units, price_usd_nanos, categories) VALUES
+      ('OLJCESPC7Z', 'Sunglasses',           'Add a modern touch to your outfits with these sleek aviator sunglasses.',             '/static/img/products/sunglasses.jpg',            'USD', 19,  990000000, 'accessories'),
+      ('66VCHSJNUP', 'Tank Top',             'Perfectly cropped cotton tank, with a scooped neckline.',                            '/static/img/products/tank-top.jpg',              'USD', 18,  990000000, 'clothing,tops'),
+      ('1YMWWN1N4O', 'Watch',                'This gold-tone stainless steel watch will work with most of your outfits.',           '/static/img/products/watch.jpg',                 'USD', 109, 990000000, 'accessories'),
+      ('L9ECAV7KIM', 'Loafers',              'A neat addition to your summer wardrobe.',                                           '/static/img/products/loafers.jpg',               'USD', 89,  990000000, 'footwear'),
+      ('2ZYFJ3GM2N', 'Hairdryer',            'This lightweight hairdryer has 3 heat and speed settings. It''s perfect for travel.', '/static/img/products/hairdryer.jpg',             'USD', 24,  990000000, 'hair,beauty'),
+      ('0PUK6V6EV0', 'Candle Holder',        'This small but intricate candle holder is an excellent gift.',                       '/static/img/products/candle-holder.jpg',         'USD', 18,  990000000, 'decor,home'),
+      ('LS4PSXUNUM', 'Salt & Pepper Shakers','Add some flavor to your kitchen.',                                                   '/static/img/products/salt-and-pepper-shakers.jpg','USD', 18,  490000000, 'kitchen'),
+      ('9SIQT8TOJO', 'Bamboo Glass Jar',     'This bamboo glass jar can hold 57 oz (1.7 l) and is perfect for any kitchen.',      '/static/img/products/bamboo-glass-jar.jpg',      'USD', 5,   490000000, 'kitchen'),
+      ('6E92ZMYYFZ', 'Mug',                  'A simple mug with a mustard interior.',                                              '/static/img/products/mug.jpg',                   'USD', 8,   990000000, 'kitchen')
+    ON CONFLICT (id) DO NOTHING;
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed-products
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+      containers:
+        - name: seed
+          image: postgres:17-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              PGHOST=$RDS_HOST \
+              PGPORT=$RDS_PORT \
+              PGDATABASE=$RDS_DB_NAME \
+              PGUSER=$RDS_USER \
+              PGPASSWORD=$RDS_PASSWORD \
+              PGSSLMODE=$RDS_SSLMODE \
+              psql -f /sql/seed.sql
+          envFrom:
+            - secretRef:
+                name: rds-credentials
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: sql
+          configMap:
+            name: seed-products-sql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: shippingservice
   labels:
     app: shippingservice
 spec:
+  replicas: 3
   selector:
     matchLabels:
       app: shippingservice
@@ -1319,24 +1557,32 @@ spec:
         ports:
         - containerPort: 50051
         env:
+        - name: COLLECTOR_SERVICE_ADDR
+          value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+        - name: ENABLE_TRACING
+          value: "1"
         - name: PORT
           value: "50051"
         - name: DISABLE_PROFILER
           value: "1"
         readinessProbe:
           periodSeconds: 5
+          timeoutSeconds: 5
           grpc:
             port: 50051
         livenessProbe:
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
           grpc:
             port: 50051
         resources:
           requests:
-            cpu: 100m
-            memory: 64Mi
-          limits:
             cpu: 200m
             memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
@@ -1357,79 +1603,4 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: shippingservice
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: adservice
-  labels:
-    app: adservice
-spec:
-  selector:
-    matchLabels:
-      app: adservice
-  template:
-    metadata:
-      labels:
-        app: adservice
-    spec:
-      serviceAccountName: adservice
-      terminationGracePeriodSeconds: 5
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
-      containers:
-      - name: server
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
-        image: us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice:v0.10.4
-        ports:
-        - containerPort: 9555
-        env:
-        - name: PORT
-          value: "9555"
-        resources:
-          requests:
-            cpu: 200m
-            memory: 180Mi
-          limits:
-            cpu: 300m
-            memory: 300Mi
-        readinessProbe:
-          initialDelaySeconds: 20
-          periodSeconds: 15
-          grpc:
-            port: 9555
-        livenessProbe:
-          initialDelaySeconds: 20
-          periodSeconds: 15
-          grpc:
-            port: 9555
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: adservice
-  labels:
-    app: adservice
-spec:
-  type: ClusterIP
-  selector:
-    app: adservice
-  ports:
-  - name: grpc
-    port: 9555
-    targetPort: 9555
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: adservice
 # [END gke_release_kubernetes_manifests_microservices_demo]

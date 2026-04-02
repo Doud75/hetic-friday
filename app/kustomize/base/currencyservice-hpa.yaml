@@ -7,7 +7,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: currencyservice
-  minReplicas: 3
+  minReplicas: 5
   maxReplicas: 50
   metrics:
     - type: Resource
@@ -15,7 +15,7 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 70
+          averageUtilization: 50
     - type: Resource
       resource:
         name: memory

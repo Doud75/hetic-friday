@@ -222,12 +222,10 @@ kubectl apply -f .\app\kubernetes-manifests\load-test.yaml
 ```
 
 **3. Monitorer la progression du test**
-K6 operator pour EKS n'expose pas en temps réel la barre de progression d'un test de charge en cours, nous avons besoin d'un port forwarding :
 ```bash
 # Récupérer le nom de l'instance de test (ex: ecommerce-load-test-1-57r25)
 kubectl get pods 
-kubectl port-forward <INSTANCE-DE-TEST> 6565:6565
-curl http://localhost:6565/v1/status
+kubectl logs -f <INSTANCE-DE-TEST>
 ```
 
 **4. Mettre à jour le script de montée de charge**

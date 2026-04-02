@@ -19,7 +19,7 @@ metadata:
   labels:
     app: currencyservice
 spec:
-  replicas: 3
+  replicas: 5
   selector:
     matchLabels:
       app: currencyservice
@@ -49,6 +49,10 @@ spec:
             - name: grpc
               containerPort: 7000
           env:
+            - name: COLLECTOR_SERVICE_ADDR
+              value: "jaeger-collector.monitoring.svc.cluster.local:4317"
+            - name: ENABLE_TRACING
+              value: "1"
             - name: PORT
               value: "7000"
             - name: DISABLE_PROFILER
@@ -61,11 +65,11 @@ spec:
               port: 7000
           resources:
             requests:
-              cpu: 300m
-              memory: 128Mi
-            limits:
-              cpu: 600m
+              cpu: 500m
               memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

@@ -1,6 +1,6 @@
 // Stress test progressif - 90000 VUs max (22500 VUs par pod répartis simultanément sur 4 pods)
 import http from "k6/http";
-import { sleep, check } from "k6";
+import { group, sleep, check } from "k6";
 
 export const options = {
   discardResponseBodies: true,
@@ -34,7 +34,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || "http://hetic-friday-prod-alb-170460687.eu-central-1.elb.amazonaws.com";
+const BASE_URL = "http://hetic-friday-prod-alb-170460687.eu-central-1.elb.amazonaws.com";
 
 const params = {
   headers: { "Connection": "keep-alive" },
