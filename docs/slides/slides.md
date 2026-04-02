@@ -41,6 +41,47 @@ drawings:
 </div>
 
 ---
+transition: fade
+---
+
+# Stack technique
+
+<div class="grid grid-cols-4 gap-3 mt-4 text-center text-sm">
+  <div class="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3">
+    <div class="text-orange-400 font-bold mb-1">IaC</div>
+    <div class="text-gray-300 text-xs">Terraform · Terragrunt</div>
+  </div>
+  <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
+    <div class="text-blue-400 font-bold mb-1">Compute</div>
+    <div class="text-gray-300 text-xs">AWS EKS Auto Mode · Spot Instances</div>
+  </div>
+  <div class="bg-green-900/30 border border-green-500/30 rounded-lg p-3">
+    <div class="text-green-400 font-bold mb-1">Réseau</div>
+    <div class="text-gray-300 text-xs">ALB · WAF v2 · VPC 3 tiers</div>
+  </div>
+  <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
+    <div class="text-purple-400 font-bold mb-1">Data</div>
+    <div class="text-gray-300 text-xs">RDS PostgreSQL Multi-AZ · Redis</div>
+  </div>
+  <div class="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3">
+    <div class="text-yellow-400 font-bold mb-1">Observabilité</div>
+    <div class="text-gray-300 text-xs">Prometheus · Grafana · Jaeger</div>
+  </div>
+  <div class="bg-pink-900/30 border border-pink-500/30 rounded-lg p-3">
+    <div class="text-pink-400 font-bold mb-1">CI/CD</div>
+    <div class="text-gray-300 text-xs">GitHub Actions · Skaffold · ECR</div>
+  </div>
+  <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+    <div class="text-red-400 font-bold mb-1">Résilience</div>
+    <div class="text-gray-300 text-xs">Chaos Mesh · HPA · Cluster Autoscaler</div>
+  </div>
+  <div class="bg-gray-700/50 border border-gray-500/30 rounded-lg p-3">
+    <div class="text-gray-300 font-bold mb-1">Tests de charge</div>
+    <div class="text-gray-300 text-xs">K6 · 4 pods EKS · 90K VUs</div>
+  </div>
+</div>
+
+---
 layout: section
 transition: slide-up
 ---
@@ -50,18 +91,12 @@ transition: slide-up
 
 ---
 transition: fade
+class: "!p-2"
 ---
 
-# Vue d'ensemble de l'infrastructure
-
-<div class="flex justify-center mt-2">
-  <img src="./architecture_aws_detailed.png" class="max-h-96 rounded-lg border border-gray-700/50 shadow-2xl" />
-</div>
-
-<div class="mt-4 flex gap-4 justify-center text-sm text-gray-400">
-  <span class="bg-red-900/30 border border-red-500/30 rounded px-3 py-1">Public 10.0.0.0/20</span>
-  <span class="bg-blue-900/30 border border-blue-500/30 rounded px-3 py-1">Private 10.0.16.0/20</span>
-  <span class="bg-green-900/30 border border-green-500/30 rounded px-3 py-1">Data 10.0.32.0/21</span>
+<div class="flex flex-col items-center justify-center h-full">
+  <img src="./architecture_aws_detailed.png" class="max-h-[470px] w-auto rounded-lg border border-gray-700/50 shadow-2xl" />
+  <p class="text-xs text-gray-500 mt-2">VPC 10.0.0.0/16 · 3 AZ eu-central-1 · EKS Auto Mode Kubernetes 1.34 · ALB · RDS Multi-AZ</p>
 </div>
 
 ---
@@ -230,7 +265,7 @@ transition: fade
 - **System** : On-Demand — stabilité control plane
 - **App** : Spot — **60-70%** moins cher que On-Demand
 
-**HPA** : scale-up agressif (×3/15s), scale-down conservateur (10 min)
+**HPA** : scale-up +200% / 15s, scale-down conservateur (10 min)
 
 ::right::
 
@@ -443,6 +478,112 @@ rules:
 </div>
 
 ---
+transition: fade
+class: "!p-2"
+---
+
+# Dashboard Grafana — test 90K users
+
+<div class="flex flex-col items-center justify-center h-full">
+  <img src="./grafana-dashboard-load-test-90000-all-metrics.png" class="max-h-[440px] w-auto rounded-lg border border-gray-700/50 shadow-2xl" />
+  <p class="text-xs text-gray-500 mt-2">CPU moyen ~58% en pic · 90 → 500+ pods · autoscaling HPA actif</p>
+</div>
+
+---
+layout: section
+transition: slide-up
+---
+
+# Tests de Charge
+<p class="text-gray-400">K6 · 4 pods EKS · 90 000 utilisateurs simultanés</p>
+
+---
+layout: two-cols
+zoom: 0.88
+transition: fade
+---
+
+# Scénario K6
+
+**K6 déployé directement dans EKS**
+- 4 pods envoyant chacun 22 500 VUs
+- IPs whitelistées dans le WAF (évite le rate-limiting)
+- Parcours réaliste : accueil → fiche produit → panier → commande
+
+**Montée en charge par paliers**
+
+<v-click>
+
+| Palier | VUs | Durée montée | Stabilisation |
+|---|---|---|---|
+| Échauffement | 5 000 | 2 min | 3 min |
+| Palier 1 | 15 000 | 5 min | 5 min |
+| Palier 2 | 40 000 | 5 min | 5 min |
+| Palier 3 | 70 000 | 5 min | 5 min |
+| **Pic final** | **90 000** | **5 min** | **10 min** |
+
+</v-click>
+
+::right::
+
+<div class="pl-4">
+
+<v-click>
+
+**Résultats mesurés (pod 1/4)**
+
+<img src="./k6-load-test-90000-users-results-pod-1-on-4.png" class="rounded-lg border border-gray-700/50 w-full" />
+
+</v-click>
+
+</div>
+
+---
+zoom: 0.88
+transition: fade
+---
+
+# Résultats du test de charge
+
+<div class="grid grid-cols-3 gap-4 mt-4">
+
+<div class="bg-green-900/30 border border-green-500/40 rounded-lg p-4 text-center">
+  <div class="text-3xl font-bold text-green-400">0.03%</div>
+  <div class="text-sm text-gray-400 mt-1">taux d'échec</div>
+  <div class="text-xs text-gray-500 mt-1">objectif &lt; 1% ✓</div>
+</div>
+
+<div class="bg-blue-900/30 border border-blue-500/40 rounded-lg p-4 text-center">
+  <div class="text-3xl font-bold text-blue-400">768ms</div>
+  <div class="text-sm text-gray-400 mt-1">latence moyenne</div>
+  <div class="text-xs text-gray-500 mt-1">sous 90K utilisateurs</div>
+</div>
+
+<div class="bg-yellow-900/30 border border-yellow-500/40 rounded-lg p-4 text-center">
+  <div class="text-3xl font-bold text-yellow-400">4.4s</div>
+  <div class="text-sm text-gray-400 mt-1">latence p95</div>
+  <div class="text-xs text-gray-500 mt-1">montée en charge volontairement rapide</div>
+</div>
+
+</div>
+
+<div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+
+<div class="bg-gray-800/60 border border-gray-600 rounded-lg p-3">
+  <div class="text-orange-400 font-bold mb-1">Autoscaling</div>
+  <p class="text-gray-300 text-xs">Parc applicatif : <strong class="text-white">90 → 500+ pods</strong> sous charge</p>
+  <p class="text-gray-300 text-xs mt-1">HPA + Cluster Autoscaler ont répondu sans intervention</p>
+</div>
+
+<div class="bg-gray-800/60 border border-gray-600 rounded-lg p-3">
+  <div class="text-purple-400 font-bold mb-1">Cache Nginx</div>
+  <p class="text-gray-300 text-xs">~80% de cache hit sur les pages produits et accueil</p>
+  <p class="text-gray-300 text-xs mt-1">Levier majeur de réduction de latence sous charge</p>
+</div>
+
+</div>
+
+---
 layout: section
 transition: slide-up
 ---
@@ -642,9 +783,7 @@ transition: zoom
 
 # 90 000 users
 
-**objectif p95 &lt; 2s · objectif error rate &lt; 1%**
-
-<p class="text-gray-400 mt-2">Infrastructure Multi-AZ · HPA · Chaos Mesh · 7 incidents résolus en production</p>
+**0.03% d'erreurs · 768ms latence moyenne · 500+ pods**
 
 ---
 layout: end
@@ -652,7 +791,3 @@ transition: fade
 ---
 
 # Merci
-
-<div class="mt-6 text-gray-400 text-sm flex gap-4 justify-center">
-  <span>AWS EKS Auto Mode · Terraform + Terragrunt · Kubernetes · Prometheus · Chaos Mesh · GitHub Actions</span>
-</div>
