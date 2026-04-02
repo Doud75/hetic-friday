@@ -58,5 +58,8 @@ node_modules/
 dist/
 build/
 
+.agents/
+.claude/
+skills-lock.json
 CLAUDE.md
 
