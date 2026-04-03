@@ -328,7 +328,7 @@ transition: slide-up
 ---
 
 # EKS & Auto-Scaling
-<p class="text-gray-400">HPA · Spot Instances · Cluster Autoscaler</p>
+<p class="text-gray-400">HPA · Spot Instances · EKS Auto Mode</p>
 
 <!--
 adrien j
@@ -407,7 +407,7 @@ transition: fade
 
 <div class="pl-4">
 
-**Cluster Autoscaler**
+**EKS Auto Mode — scaling des nodes**
 
 - Provisionnement nœud Spot : ~2-4 min
 - Scale-down conservateur : fenêtre 10 min
@@ -722,7 +722,7 @@ transition: fade
 <div class="bg-gray-800/60 border border-gray-600 rounded-lg p-3">
   <div class="text-orange-400 font-bold mb-1">Autoscaling</div>
   <p class="text-gray-300 text-xs">Parc applicatif : <strong class="text-white">90 → 500+ pods</strong> sous charge</p>
-  <p class="text-gray-300 text-xs mt-1">HPA + Cluster Autoscaler ont répondu sans intervention</p>
+  <p class="text-gray-300 text-xs mt-1">HPA + EKS Auto Mode ont répondu sans intervention</p>
 </div>
 
 <div class="bg-gray-800/60 border border-gray-600 rounded-lg p-3">
