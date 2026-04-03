@@ -104,6 +104,9 @@ transition: slide-up
 
 <!--
 adam
+
+On va maintenant voir notre architecture AWS.
+On a conçu un VPC 3 tiers réparti sur 3 zones de disponibilité à Frankfurt, avec EKS en Auto Mode pour l'orchestration et un RDS Multi-AZ pour la base de données.
 -->
 
 ---
@@ -118,6 +121,25 @@ class: "!p-2"
 
 <!--
 adam
+
+
+1. ENTRÉE : Le trafic arrive d'Internet, passe par l'Internet Gateway, puis atterrit sur notre ALB 
+— le point d'entrée unique de l'app. Devant l'ALB on a un WAF qui filtre les attaques : injection SQL, XSS, et un rate-limit à 2000 req/5min par IP.
+
+2. COUCHE PUBLIQUE : Ici les subnets publics avec l'ALB et les NAT Gateways — 
+un par AZ en prod, soit 3 au total. Le NAT permet aux pods privés de télécharger des images Docker sans être exposés sur Internet.
+
+3. COUCHE PRIVÉE : C'est là que tourne l'app. Les EKS Nodes sont répartis sur les 3 AZ. 
+On utilise EKS Auto Mode, AWS provisionne et scale les nœuds automatiquement. 
+Nos pods — frontend, cart service, checkout — tournent ici, sans aucune IP publique.
+
+4. COUCHE DATA : La plus protégée. RDS PostgreSQL Multi-AZ avec réplication synchrone.
+ Si la primaire tombe, bascule automatique en quelques secondes. 
+ Le trafic est restreint au port 5432, uniquement depuis les subnets privés.
+
+5. RÉSUMÉ : Défense en profondeur —
+Chaque couche ne communique qu'avec ses voisines via Security Groups et NACLs.
+Un utilisateur ne voit que l'ALB, les pods ne voient que le réseau privé, la DB ne parle qu'aux pods.
 -->
 
 ---
@@ -130,6 +152,9 @@ transition: slide-up
 
 <!--
 adam
+
+Toute cette infra, on ne l'a pas créée à la main dans la console AWS.
+ C'est du 100% Infrastructure as Code avec Terraform et Terragrunt.
 -->
 
 ---
@@ -200,6 +225,19 @@ cd live/prod && terragrunt run-all apply
 
 <!--
 adam
+
+**Colonne gauche :**
+On a 6 modules Terraform réutilisables : VPC, EKS, RDS, Security,
+ Monitoring CloudWatch, et Monitoring K8s pour Prometheus/Grafana via Helm.
+
+On a 2 environnements gérés par Terragrunt : dev (minimaliste, 1 NAT GW) et prod (haute dispo, 3 NAT GW).
+
+**Colonne droite :**
+Ici un exemple concret de fichier Terragrunt. On voit qu'il pointe vers le module EKS, qu'il récupère le VPC ID en dépendance — donc Terragrunt sait qu'il faut créer le VPC AVANT EKS — et il injecte les paramètres spécifiques à la prod.
+
+Pour déployer toute l'infra, c'est une seule commande : terragrunt run-all apply. 
+Le state est centralisé dans S3 avec un lock DynamoDB pour éviter les conflits 
+si quelqu'un d'autre fait un apply en même temps.
 -->
 
 ---
@@ -476,6 +514,10 @@ transition: slide-up
 
 <!--
 adam
+
+Pour surveiller tout ça sous une charge de 90 000 utilisateurs,
+ on a mis en place une stack d'observabilité complète qui couvre 
+ les 4 piliers : métriques, logs, tracing et alerting.
 -->
 
 ---
@@ -548,6 +590,23 @@ rules:
 
 <!--
 adam
+
+**Colonne gauche :**
+Tout est déployé via Terraform avec le provider Helm :
+- Prometheus collecte les métriques (CPU, mémoire, latence, taux d'erreur) avec 15 jours de rétention sur un disque EBS — c'est un disque dur virtuel dans le cloud, 50 Go, qui persiste même si le pod redémarre
+- Grafana affiche tout ça dans des dashboards custom
+- Jaeger fait du tracing distribué :
+ on suit une requête à travers tous les microservices pour identifier les goulots d'étranglement
+- AlertManager déclenche des alertes automatiques
+- Et on a aussi CloudWatch + SNS côté AWS : ça surveille l'infra en dessous du cluster (les NAT Gateways, le réseau). Si le cluster EKS tombe, Prometheus tombe avec. Mais CloudWatch continue de tourner et nous envoie des emails via SNS.
+
+**Colonne droite :**
+On a des règles d'alertes personnalisées pour le Black Friday :
+- Latence p95 > 2 secondes
+- Taux d'erreur > 1%
+- Pod qui crash en boucle
+- Et surtout si le HPA est au max depuis plus de 10 minutes → ça veut dire qu'on ne peut plus scaler,
+ il faut intervenir manuellement.
 -->
 
 ---
@@ -564,6 +623,11 @@ class: "!p-2"
 
 <!--
 adam
+
+Voilà notre dashboard Grafana en plein test de charge à 90 000 utilisateurs.
+ On voit le CPU moyen à 58% en pic, le parc qui passe de 90 à plus de 500 pods grâce au HPA,
+  et la latence qui reste contenue.
+   Tout ça sans intervention manuelle.
 -->
 
 ---
@@ -773,6 +837,9 @@ transition: slide-up
 
 <!--
 adam
+
+On a rencontré plusieurs vrais incidents pendant le déploiement.
+ Voici les 5 principaux et comment on les a résolus.
 -->
 
 ---
@@ -786,9 +853,9 @@ transition: fade
 
 <div v-click class="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
   <div class="text-red-400 font-bold mb-1 text-sm">ALB non créable automatiquement</div>
-  <p class="text-gray-300">Restriction compte AWS — <code>LoadBalancer</code> en <code>Pending</code> indéfiniment.</p>
-  <p class="text-orange-300 mt-1">→ ALB créé manuellement. Target Groups sur IPs des pods.</p>
-  <p class="text-gray-500 mt-1">⚠️ Si pod redémarre → IP change → Target Group Unhealthy</p>
+  <p class="text-gray-300">Le <code>LoadBalancer</code> des services K8s restait en <code>Pending</code> indéfiniment.</p>
+  <p class="text-green-300 mt-1">→ ALB créé via Terraform + <code>TargetGroupBindings</code> K8s pour enregistrer les IPs des pods automatiquement.</p>
+  <p class="text-gray-500 mt-1">EKS Auto Mode synchronise les Target Groups quand les pods scale ou restart.</p>
 </div>
 
 <div v-click class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
@@ -821,6 +888,27 @@ transition: fade
 
 <!--
 adam
+
+**Pointer chaque carte une par une :**
+
+1. ALB : Le type LoadBalancer des services K8s restait en Pending sur notre compte. 
+On a contourné ça en créant l'ALB via Terraform, avec des TargetGroupBindings 
+pour que EKS Auto Mode enregistre automatiquement les IPs des pods dans les Target Groups. 
+Quand le HPA scale ou qu'un pod restart, c'est transparent.
+
+2. PODS PENDING : Nos subnets privés n'avaient pas les bons tags pour qu'EKS Auto Mode les découvre.
+ On a ajouté le tag kubernetes.io/cluster et intégré ça dans le module VPC Terraform.
+
+3. PROMETHEUS : La StorageClass gp2 n'est pas compatible avec EKS Auto Mode.
+ Le PVC restait en Pending. On a migré vers ebs-auto, la classe native d'Auto Mode.
+
+4. EIPs : Des Terraform apply avortés laissaient des Elastic IPs orphelines.
+ On a atteint la limite AWS. Libération manuelle + runbook pour vérifier avant chaque apply.
+
+5. LE PLUS CRITIQUE — Erreurs 500 : Le HPA détruisait des pods CartService 
+qui avaient encore des connexions gRPC actives. 
+Fix : stabilisation scale-down à 10 min + hook preStop de 15s pour laisser
+ les connexions se terminer proprement.
 -->
 
 ---
